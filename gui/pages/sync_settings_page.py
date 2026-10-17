@@ -354,15 +354,27 @@ class SyncSettingsPage(BasePage):
     # ─── BasePage Override'ları ─────────────────────────────────────
     def on_enter(self) -> None:
         """Sayfaya girildiğinde verileri geri yükle."""
+        saved = {}
         if self.controller:
-            saved = self.controller.get_saved_page_data(self.PAGE_NAME)
-            if saved:
-                if saved.get("node_role"):
-                    self.role_var.set(saved["node_role"])
-                if saved.get("primary_device_id"):
-                    self.device_id_var.set(saved["primary_device_id"])
-                if saved.get("join_key"):
-                    self.join_key_var.set(saved["join_key"])
+            saved = self.controller.get_saved_page_data(self.PAGE_NAME) or {}
+
+        if not saved:
+            try:
+                from core.config_manager import ConfigManager
+
+                cfg_mgr = ConfigManager()
+                if cfg_mgr.exists():
+                    saved = cfg_mgr.load()
+            except Exception:
+                pass
+
+        if saved:
+            if saved.get("node_role") in ("primary", "secondary"):
+                self.role_var.set(saved["node_role"])
+            if saved.get("primary_device_id"):
+                self.device_id_var.set(saved["primary_device_id"])
+            if saved.get("join_key"):
+                self.join_key_var.set(saved["join_key"])
 
         self._on_role_change()
 

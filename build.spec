@@ -52,6 +52,7 @@ a = Analysis(
         'pathlib',
         'requests',
         'certifi',
+        'xml.etree.ElementTree',
     ],
     hookspath=[],
     hooksconfig={},

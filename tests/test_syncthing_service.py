@@ -187,6 +187,65 @@ class TestSyncthingService(unittest.TestCase):
         payload = mock_put.call_args[1].get("json")
         self.assertIsInstance(payload, list, "PUT payload list olmali, dict degil")
 
+    def test_generate_initial_config_preserves_existing_devices(self):
+        """Mevcut config.xml güncellenirken eşleşmiş cihazlar ve klasörler korunmalı."""
+        home_dir = self.temp_dir / "syncthing_home"
+        home_dir.mkdir(parents=True, exist_ok=True)
+        config_path = home_dir / "config.xml"
+        config_path.write_text(
+            """<?xml version="1.0" encoding="utf-8"?>
+<configuration version="52">
+    <folder id="auto-home-web" label="AHWS Web Site" path="C:/old_site" type="sendreceive">
+        <device id="AAAAAAA-BBBBBBB-CCCCCCC-DDDDDDD-EEEEEEE-FFFFFFF-GGGGGGG-HHHHHHH"></device>
+    </folder>
+    <device id="AAAAAAA-BBBBBBB-CCCCCCC-DDDDDDD-EEEEEEE-FFFFFFF-GGGGGGG-HHHHHHH" name="Yedek"></device>
+    <gui enabled="true" tls="false">
+        <address>127.0.0.1:8384</address>
+        <apikey>old-key</apikey>
+    </gui>
+</configuration>""",
+            encoding="utf-8",
+        )
+
+        self.service.generate_initial_config(
+            home_dir=home_dir,
+            gui_port=8385,
+            api_key="new-api-key-999",
+            default_folder_path="C:/new_site",
+        )
+
+        updated_xml = config_path.read_text(encoding="utf-8")
+        self.assertIn("new-api-key-999", updated_xml)
+        self.assertIn("127.0.0.1:8385", updated_xml)
+        self.assertIn("AAAAAAA-BBBBBBB-CCCCCCC-DDDDDDD-EEEEEEE-FFFFFFF-GGGGGGG-HHHHHHH", updated_xml)
+        self.assertIn("auto-home-web", updated_xml)
+
+    @patch("services.syncthing_service.requests.put")
+    @patch("services.syncthing_service.requests.get")
+    def test_remove_device_cleans_devices_and_folders(self, mock_get, mock_put):
+        """remove_device() cihazı hem devices hem folders listesinden kaldırmalı."""
+        target_id = "AAAAAAA-BBBBBBB-CCCCCCC-DDDDDDD-EEEEEEE-FFFFFFF-GGGGGGG-HHHHHHH"
+        local_id = "1111111-2222222-3333333-4444444-5555555-6666666-7777777-8888888"
+
+        resp_devices = MagicMock(status_code=200)
+        resp_devices.json.return_value = [
+            {"deviceID": local_id, "name": "Local"},
+            {"deviceID": target_id, "name": "Remote"},
+        ]
+        resp_folders = MagicMock(status_code=200)
+        resp_folders.json.return_value = [
+            {
+                "id": "auto-home-web",
+                "path": "C:/site",
+                "devices": [{"deviceID": local_id}, {"deviceID": target_id}],
+            }
+        ]
+        mock_get.side_effect = [resp_devices, resp_folders]
+        mock_put.return_value = MagicMock(status_code=200)
+
+        self.service.remove_device(target_id)
+        self.assertEqual(mock_put.call_count, 2)
+
 
 if __name__ == "__main__":
     unittest.main()

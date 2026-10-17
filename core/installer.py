@@ -234,18 +234,36 @@ class InstallerEngine:
         """
         Merkez düğüm senkronizasyon hazırlığı.
 
-        Site klasörünü Syncthing'de paylaşılabilir hale getirir.
+        Site klasörünü Syncthing'de paylaşılabilir hale getirir (varsa önceki
+        eşleşmiş yedek düğümleri korur).
         """
         self._emit(t("step_primary"), 88)
 
         folder_id = "auto-home-web"
         label = "AHWS Web Site"
 
+        existing_sec_ids: list[str] = []
+        try:
+            prev = self.config_manager.load()
+            for did in prev.get("secondary_device_ids", []):
+                if did and did != config.local_device_id and did not in existing_sec_ids:
+                    existing_sec_ids.append(did)
+        except Exception:
+            pass
+
+        try:
+            for dev in self.syncthing_service.get_devices():
+                did = dev.get("deviceID", "")
+                if did and did != config.local_device_id and did not in existing_sec_ids:
+                    existing_sec_ids.append(did)
+        except Exception:
+            pass
+
         try:
             self.syncthing_service.share_folder(
                 folder_id=folder_id,
                 folder_path=config.site_root_path,
-                device_ids=[],  # Cihazlar daha sonra "Yedek Ekle" ile eklenecek
+                device_ids=existing_sec_ids,
                 label=label,
             )
             logger.info("Merkez site klasörü Syncthing'de paylaşıldı")
@@ -321,6 +339,14 @@ class InstallerEngine:
 
         Rollback ve uninstaller desteği için tüm parametreler saklanır.
         """
+        prev_sec_ids: list[str] = []
+        if config.node_role == NodeRole.PRIMARY:
+            try:
+                prev_data = self.config_manager.load()
+                prev_sec_ids = list(prev_data.get("secondary_device_ids", []))
+            except Exception:
+                pass
+
         data = config.to_dict()
         data.update({
             "installed_services": [
@@ -336,6 +362,7 @@ class InstallerEngine:
                 str(constants.SITE_DIR),
             ],
             "node_role": config.node_role.value,
+            "secondary_device_ids": prev_sec_ids if config.node_role == NodeRole.PRIMARY else [],
             "syncthing": {
                 "api_key": config.syncthing_api_key,
                 "gui_port": config.syncthing_gui_port,
@@ -410,6 +437,58 @@ class InstallerEngine:
 
         logger.info("Tüm servisler ve yapılandırma başarıyla kaldırıldı")
 
+    def restart_all_services(self) -> dict:
+        """
+        Kurulu olan tüm AHWS servislerini (Caddy, Cloudflared, Syncthing)
+        yeniden başlatır / çalışmıyorsa başlatır ve güncel sağlık durumunu döndürür.
+        """
+        logger.info("Tüm AHWS servisleri yeniden başlatılıyor...")
+        for name, svc in (
+            ("Caddy", self.caddy_service),
+            ("Cloudflared", self.cloudflare_service),
+            ("Syncthing", self.syncthing_service),
+        ):
+            try:
+                if svc.is_installed():
+                    svc.restart()
+            except Exception as e:
+                logger.warning(f"{name} yeniden başlatılırken uyarı: {e}")
+        return self.get_system_health()
+
+    def get_paired_nodes(self) -> list[dict]:
+        """
+        Syncthing üzerinde eşleşmiş uzak cihazların listesini ve canlı bağlantı
+        durumlarını döndürür.
+        """
+        result: list[dict] = []
+        if not self.syncthing_service.is_running():
+            return result
+
+        try:
+            self.syncthing_service.sync_credentials_from_config()
+            config_data = self.config_manager.load()
+            try:
+                local_id = self.syncthing_service.get_device_id()
+            except Exception:
+                local_id = config_data.get("local_device_id", "")
+
+            devices = self.syncthing_service.get_devices()
+            conns = self.syncthing_service.get_connections()
+            for dev in devices:
+                did = dev.get("deviceID", "")
+                if not did or did == local_id:
+                    continue
+                conn_info = conns.get(did, {}) if isinstance(conns, dict) else {}
+                is_conn = isinstance(conn_info, dict) and bool(conn_info.get("connected"))
+                result.append({
+                    "device_id": did,
+                    "name": dev.get("name") or "Yedek Düğüm",
+                    "connected": is_conn,
+                })
+        except Exception as e:
+            logger.debug(f"Eşleşmiş düğümler okunamadı: {e}")
+        return result
+
     def get_system_health(self) -> dict:
         """
         Tüm servislerin ve yerel web sunucusunun canlı sağlık durumunu döndürür.
@@ -430,26 +509,9 @@ class InstallerEngine:
         connected_devices = 0
         if st_running:
             try:
-                self.syncthing_service.sync_credentials_from_config()
-                try:
-                    local_id = self.syncthing_service.get_device_id()
-                except Exception:
-                    local_id = config_data.get("local_device_id", "")
-
-                devices = self.syncthing_service.get_devices()
-                remote_ids = [
-                    d.get("deviceID")
-                    for d in devices
-                    if d.get("deviceID") and d.get("deviceID") != local_id
-                ]
-                paired_devices = len(remote_ids)
-
-                if paired_devices > 0:
-                    conns = self.syncthing_service.get_connections()
-                    connected_devices = sum(
-                        1 for rid in remote_ids
-                        if isinstance(conns.get(rid), dict) and conns[rid].get("connected") is True
-                    )
+                nodes = self.get_paired_nodes()
+                paired_devices = len(nodes)
+                connected_devices = sum(1 for n in nodes if n.get("connected"))
             except Exception:
                 pass
 
@@ -525,8 +587,25 @@ class InstallerEngine:
             if device_id not in sec_ids:
                 sec_ids.append(device_id)
             config_data["secondary_device_ids"] = sec_ids
-            self.config_manager.save(config_data)
+            self.config_manager.save(config_data, include_metadata=False)
         except Exception:
             pass
 
         logger.info(f"Yedek düğüm eklendi: {device_id[:12]}...")
+
+    def remove_secondary_node(self, device_id: str) -> None:
+        """
+        Eşleşmiş bir yedek düğümü Syncthing'den ve install_config.json'dan kaldırır.
+        """
+        self.syncthing_service.sync_credentials_from_config()
+        self.syncthing_service.remove_device(device_id)
+
+        try:
+            config_data = self.config_manager.load()
+            sec_ids = [did for did in config_data.get("secondary_device_ids", []) if did != device_id]
+            config_data["secondary_device_ids"] = sec_ids
+            self.config_manager.save(config_data, include_metadata=False)
+        except Exception:
+            pass
+
+        logger.info(f"Yedek düğüm kaldırıldı: {device_id[:12]}...")

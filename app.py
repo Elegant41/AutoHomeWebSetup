@@ -91,6 +91,7 @@ class App(tk.Tk):
 
     def _init_pages(self) -> None:
         """Tüm sihirbaz sayfalarını oluşturur ve kaydeder."""
+        from core.config_manager import ConfigManager
         from gui.pages.welcome_page import WelcomePage
         from gui.pages.server_settings_page import ServerSettingsPage
         from gui.pages.sync_settings_page import SyncSettingsPage
@@ -103,7 +104,13 @@ class App(tk.Tk):
         self.register_page(InstallPage.PAGE_NAME, InstallPage(self._container, self))
         self.register_page(FinishPage.PAGE_NAME, FinishPage(self._container, self))
 
-        # İlk sayfayı göster
+        # Mevcut kurulum varsa doğrudan Canlı Durum ve Yönetim Paneline aç, yoksa Başlangıç'a git
+        try:
+            if ConfigManager().exists():
+                self.show_page(FinishPage.PAGE_NAME)
+                return
+        except Exception:
+            pass
         self.show_page(WelcomePage.PAGE_NAME)
 
     # ─── Sayfa Yönetimi ─────────────────────────────────────────────
@@ -268,16 +275,19 @@ class App(tk.Tk):
 
         # Sayfa yığınını (back history) koruyarak kaldığımız sayfaya git
         if stack_names:
+            for p in list(self._page_stack):
+                try:
+                    p.pack_forget()
+                    if hasattr(p, "on_leave"):
+                        p.on_leave()
+                except Exception:
+                    pass
             self._page_stack.clear()
             for pname in stack_names[:-1]:
                 if pname in self._pages:
                     self._page_stack.append(self._pages[pname])
             target_name = stack_names[-1]
             if target_name in self._pages:
-                # Welcome sayfası _init_pages içinde açıldığı için gizle
-                welcome_page = self._pages.get("welcome")
-                if welcome_page and target_name != "welcome":
-                    welcome_page.pack_forget()
                 self.show_page(target_name)
 
     # ─── Veri Yönetimi ──────────────────────────────────────────────
@@ -313,7 +323,12 @@ class App(tk.Tk):
         sync_data = self._page_data.get("sync_settings", {})
         role = sync_data.get("node_role") or saved.get("node_role", "primary")
         config.node_role = NodeRole(role) if role in ("primary", "secondary") else NodeRole.PRIMARY
-        config.primary_device_id = sync_data.get("primary_device_id") or saved.get("primary_device_id", "")
+        if config.node_role == NodeRole.PRIMARY:
+            config.primary_device_id = ""
+        elif "sync_settings" in self._page_data:
+            config.primary_device_id = sync_data.get("primary_device_id", "")
+        else:
+            config.primary_device_id = saved.get("primary_device_id", "")
 
         # Cihaz ID ve Syncthing bilgileri
         config.local_device_id = saved.get("local_device_id", "")

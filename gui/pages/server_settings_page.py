@@ -45,15 +45,15 @@ class ServerSettingsPage(BasePage):
             title=t("server_title"),
             subtitle=t("server_subtitle"),
         )
-        header.pack(fill=tk.X, padx=theme.PADDING_LARGE, pady=(16, 8))
+        header.pack(fill=tk.X, padx=theme.PADDING_LARGE, pady=(10, 6))
 
         # ─── İçerik ─────────────────────────────────────────────────
         content = tk.Frame(self, bg=theme.BG_COLOR)
-        content.pack(fill=tk.BOTH, expand=True, padx=theme.PADDING_LARGE, pady=(0, 8))
+        content.pack(fill=tk.BOTH, expand=True, padx=theme.PADDING_LARGE, pady=(0, 6))
 
         # ─── 1. Web Sitesi Klasörü ──────────────────────────────────
-        folder_card = CardFrame(content, padx=16, pady=10)
-        folder_card.pack(fill=tk.X, pady=(0, 8))
+        folder_card = CardFrame(content, padx=16, pady=8)
+        folder_card.pack(fill=tk.X, pady=(0, 6))
 
         folder_header = tk.Frame(folder_card, bg=theme.BG_SECONDARY)
         folder_header.pack(fill=tk.X)
@@ -374,19 +374,31 @@ class ServerSettingsPage(BasePage):
         else:
             self.folder_desc.config(text=t("server_folder_desc"))
 
+        saved = {}
         if self.controller:
-            saved = self.controller.get_saved_page_data(self.PAGE_NAME)
-            if saved:
-                if saved.get("site_root_path"):
-                    self.folder_var.set(saved["site_root_path"])
-                if saved.get("cloudflare_token"):
-                    self.token_var.set(saved["cloudflare_token"])
-                if saved.get("public_domain") is not None:
-                    self.domain_var.set(saved["public_domain"])
-                if saved.get("caddy_port"):
-                    self.port_var.set(str(saved["caddy_port"]))
-                if "prevent_sleep" in saved:
-                    self.prevent_sleep_var.set(bool(saved["prevent_sleep"]))
+            saved = self.controller.get_saved_page_data(self.PAGE_NAME) or {}
+
+        if not saved:
+            try:
+                from core.config_manager import ConfigManager
+
+                cfg_mgr = ConfigManager()
+                if cfg_mgr.exists():
+                    saved = cfg_mgr.load()
+            except Exception:
+                pass
+
+        if saved:
+            if saved.get("site_root_path"):
+                self.folder_var.set(saved["site_root_path"])
+            if saved.get("cloudflare_token"):
+                self.token_var.set(saved["cloudflare_token"])
+            if saved.get("public_domain") is not None:
+                self.domain_var.set(saved["public_domain"])
+            if saved.get("caddy_port"):
+                self.port_var.set(str(saved["caddy_port"]))
+            if "prevent_sleep" in saved:
+                self.prevent_sleep_var.set(bool(saved["prevent_sleep"]))
 
         if role == "secondary" and not self.folder_var.get().strip():
             self.folder_var.set(str(constants.SITE_DIR))

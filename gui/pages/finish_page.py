@@ -1,9 +1,9 @@
 """
-Bitiş ve Canlı Durum Paneli sayfası.
+Bitiş ve Canlı Yönetim / Durum Paneli sayfası.
 
-Başarı mesajı, Cihaz ID / Küme Katılım Kodu gösterimi (satır içi kopyalandı animasyonlu),
-4 kutulu canlı servis sağlık paneli (Caddy, Cloudflared, Syncthing, Eşleşen Cihaz)
-ve Merkez düğüm için "+ Yedek Bilgisayar Ekle" yönetimi içerir.
+4 kutulu canlı servis sağlık paneli (Caddy, Cloudflared, Syncthing, Senkronizasyon Ağı),
+tek tıkla servis başlatma/onarma, Cihaz ID / Küme Katılım Kodu (AHWS1) kopyalama
+ve Merkez düğüm için Yedek Bilgisayar Yönetimi içerir.
 """
 
 import threading
@@ -26,7 +26,7 @@ logger = get_logger(__name__)
 
 
 class FinishPage(BasePage):
-    """5. Adım: Bitiş + Cihaz ID + Canlı Durum Paneli."""
+    """5. Adım: Canlı Yönetim ve Durum Paneli (Control Center)."""
 
     PAGE_NAME = "finish"
 
@@ -39,37 +39,44 @@ class FinishPage(BasePage):
         self._auto_refresh_job = None
         self._is_active = False
 
-        # ─── İçerik ─────────────────────────────────────────────────
-        content = tk.Frame(self, bg=theme.BG_COLOR)
-        content.pack(fill=tk.BOTH, expand=True, padx=theme.PADDING_LARGE, pady=(10, 8))
+        # ─── Üst Başlık ve Rol Rozeti ───────────────────────────────
+        header_frame = tk.Frame(self, bg=theme.BG_COLOR)
+        header_frame.pack(fill=tk.X, padx=theme.PADDING_LARGE, pady=(8, 2))
 
-        # ─── Başarı Başlığı ─────────────────────────────────────────
-        success_frame = tk.Frame(self, bg=theme.BG_COLOR)
-        success_frame.pack(fill=tk.X, padx=theme.PADDING_LARGE, pady=(10, 2), before=content)
+        title_row = tk.Frame(header_frame, bg=theme.BG_COLOR)
+        title_row.pack(fill=tk.X)
 
-        title_row = tk.Frame(success_frame, bg=theme.BG_COLOR)
-        title_row.pack(anchor=tk.W)
+        self.role_badge = tk.Label(
+            title_row,
+            text=t("role_badge_primary"),
+            font=theme.FONT_SMALL_BOLD,
+            fg=theme.ACCENT_COLOR,
+            bg=theme.BG_TERTIARY,
+            padx=10,
+            pady=4,
+        )
+        self.role_badge.pack(side=tk.RIGHT, pady=(2, 0))
 
-        success_icon = StyledLabel(
+        self.header_icon = StyledLabel(
             title_row,
             text="✓ ",
-            font=("Segoe UI", 20, "bold"),
+            font=("Segoe UI", 18, "bold"),
             fg=theme.SUCCESS_COLOR,
             bg=theme.BG_COLOR,
         )
-        success_icon.pack(side=tk.LEFT)
+        self.header_icon.pack(side=tk.LEFT)
 
-        success_title = StyledLabel(
+        self.header_title = StyledLabel(
             title_row,
-            text=t("finish_title"),
+            text=t("control_center_title"),
             font=theme.FONT_TITLE,
-            fg=theme.SUCCESS_COLOR,
+            fg=theme.FG_COLOR,
             bg=theme.BG_COLOR,
         )
-        success_title.pack(side=tk.LEFT)
+        self.header_title.pack(side=tk.LEFT)
 
-        success_subtitle = StyledLabel(
-            success_frame,
+        self.header_subtitle = StyledLabel(
+            header_frame,
             text=t("finish_success_msg"),
             font=theme.FONT_SMALL,
             fg=theme.FG_SECONDARY,
@@ -77,22 +84,36 @@ class FinishPage(BasePage):
             wraplength=760,
             justify=tk.LEFT,
         )
-        success_subtitle.pack(anchor=tk.W, pady=(2, 0))
+        self.header_subtitle.pack(anchor=tk.W, pady=(1, 0))
+
+        # ─── İçerik Alanı ───────────────────────────────────────────
+        content = tk.Frame(self, bg=theme.BG_COLOR)
+        content.pack(fill=tk.BOTH, expand=True, padx=theme.PADDING_LARGE, pady=(4, 6))
 
         # ─── 1. Canlı Sistem ve Servis Durumu Kartı (4 Kutulu Grid) ─
-        self.health_card = CardFrame(content, padx=16, pady=12)
-        self.health_card.pack(fill=tk.X, pady=(0, 8))
+        self.health_card = CardFrame(content, padx=16, pady=8)
+        self.health_card.pack(fill=tk.X, pady=(0, 6))
 
         health_header = tk.Frame(self.health_card, bg=theme.BG_SECONDARY)
         health_header.pack(fill=tk.X, pady=(0, 8))
 
-        refresh_btn = SecondaryButton(
+        self.refresh_btn = SecondaryButton(
             health_header,
             text=t("btn_refresh_status"),
             command=self.refresh_health_status,
-            width=16,
+            width=15,
+            pady=4,
         )
-        refresh_btn.pack(side=tk.RIGHT)
+        self.refresh_btn.pack(side=tk.RIGHT)
+
+        self.restart_svc_btn = SecondaryButton(
+            health_header,
+            text=t("btn_restart_services"),
+            command=self._restart_services,
+            width=22,
+            pady=4,
+        )
+        self.restart_svc_btn.pack(side=tk.RIGHT, padx=(0, 8))
 
         health_title = StyledLabel(
             health_header,
@@ -117,13 +138,13 @@ class FinishPage(BasePage):
         self.health_status_label = self.nodes_status_lbl
 
         # ─── 2. Cihaz ID & Küme Katılım Kodu Kartı ──────────────────
-        self.device_id_card = CardFrame(content, padx=16, pady=12)
+        self.device_id_card = CardFrame(content, padx=16, pady=10)
         self.device_id_card.pack(fill=tk.X, pady=(0, 8))
 
         device_id_title = StyledLabel(
             self.device_id_card,
             text=t("finish_device_id_title"),
-            font=theme.FONT_MEDIUM,
+            font=theme.FONT_SMALL_BOLD,
             fg=theme.FG_COLOR,
             bg=theme.BG_SECONDARY,
         )
@@ -136,7 +157,8 @@ class FinishPage(BasePage):
             device_id_row,
             text=t("btn_copy"),
             command=self._copy_device_id,
-            width=14,
+            width=16,
+            pady=4,
         )
         self.copy_id_btn.pack(side=tk.RIGHT, padx=(theme.PADDING_SMALL, 0))
 
@@ -147,10 +169,46 @@ class FinishPage(BasePage):
             fg=theme.ACCENT_COLOR,
             bg=theme.ENTRY_BG,
             padx=10,
-            pady=6,
+            pady=5,
             anchor=tk.W,
         )
         self.device_id_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        # Küme Katılım Anahtarı satırı (Sadece Merkez düğümde gösterilir)
+        self.join_key_frame = tk.Frame(self.device_id_card, bg=theme.BG_SECONDARY)
+
+        join_title_lbl = StyledLabel(
+            self.join_key_frame,
+            text=f"{t('finish_join_key_title')} — {t('finish_join_key_desc')}",
+            font=theme.FONT_SMALL_BOLD,
+            fg=theme.FG_COLOR,
+            bg=theme.BG_SECONDARY,
+        )
+        join_title_lbl.pack(anchor=tk.W, pady=(6, 3))
+
+        join_row = tk.Frame(self.join_key_frame, bg=theme.BG_SECONDARY)
+        join_row.pack(fill=tk.X)
+
+        self.copy_join_btn = PrimaryButton(
+            join_row,
+            text=t("btn_copy_join_key"),
+            command=self._copy_join_key,
+            width=22,
+            pady=4,
+        )
+        self.copy_join_btn.pack(side=tk.RIGHT, padx=(theme.PADDING_SMALL, 0))
+
+        self.join_key_preview = StyledLabel(
+            join_row,
+            text="",
+            font=theme.FONT_MONO_SMALL,
+            fg=theme.SUCCESS_COLOR,
+            bg=theme.ENTRY_BG,
+            padx=10,
+            pady=5,
+            anchor=tk.W,
+        )
+        self.join_key_preview.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
         self.device_id_hint = StyledLabel(
             self.device_id_card,
@@ -163,35 +221,13 @@ class FinishPage(BasePage):
         )
         self.device_id_hint.pack(anchor=tk.W, pady=(6, 0))
 
-        # Küme Katılım Anahtarı satırı (Sadece Merkez düğümde gösterilir)
-        self.join_key_frame = tk.Frame(self.device_id_card, bg=theme.BG_SECONDARY)
-
-        self.copy_join_btn = SecondaryButton(
-            self.join_key_frame,
-            text=t("btn_copy_join_key"),
-            command=self._copy_join_key,
-            width=22,
-        )
-        self.copy_join_btn.pack(side=tk.RIGHT, padx=(theme.PADDING_SMALL, 0))
-
-        join_key_lbl = StyledLabel(
-            self.join_key_frame,
-            text=f"• {t('finish_join_key_title')}: {t('finish_join_key_desc')}",
-            font=theme.FONT_SMALL,
-            fg=theme.ACCENT_COLOR,
-            bg=theme.BG_SECONDARY,
-            wraplength=520,
-            justify=tk.LEFT,
-            anchor=tk.W,
-        )
-        join_key_lbl.pack(side=tk.LEFT, fill=tk.X, expand=True)
-
-        # ─── 3. Hızlı İşlemler: Siteyi Aç, Syncthing Paneli ve Ayarlar ─
-        open_site_card = CardFrame(content, padx=16, pady=12)
-        open_site_card.pack(fill=tk.X, pady=(0, 8))
+        # ─── 3. Hızlı İşlemler ve Küme Yönetimi Kartı ───────────────
+        self.actions_card = CardFrame(content, padx=16, pady=10, border_color=theme.ACCENT_COLOR)
+        self.actions_card.pack(fill=tk.X, pady=(0, 8))
+        self.node_manager_card = self.actions_card
 
         open_site_desc = StyledLabel(
-            open_site_card,
+            self.actions_card,
             text=t("finish_open_site_desc"),
             font=theme.FONT_SMALL,
             fg=theme.FG_SECONDARY,
@@ -201,68 +237,71 @@ class FinishPage(BasePage):
         )
         open_site_desc.pack(anchor=tk.W, pady=(0, 8))
 
-        site_btn_row = tk.Frame(open_site_card, bg=theme.BG_SECONDARY)
-        site_btn_row.pack(fill=tk.X)
+        # Merkez düğüm için 2x2 dengeli buton grid'i
+        self.primary_actions_grid = tk.Frame(self.actions_card, bg=theme.BG_SECONDARY)
+        self.primary_actions_grid.grid_columnconfigure(0, weight=1, uniform="p_act")
+        self.primary_actions_grid.grid_columnconfigure(1, weight=1, uniform="p_act")
 
-        open_site_btn = PrimaryButton(
-            site_btn_row,
+        self.open_site_btn = PrimaryButton(
+            self.primary_actions_grid,
             text=t("btn_open_site_browser"),
             command=self._open_website,
-            width=24,
         )
-        open_site_btn.pack(side=tk.LEFT, padx=(0, theme.PADDING_SMALL))
+        self.open_site_btn.grid(row=0, column=0, sticky="ew", padx=(0, 6), pady=(0, 6))
 
-        open_st_btn = SecondaryButton(
-            site_btn_row,
-            text=t("btn_open_syncthing"),
-            command=self._open_syncthing_ui,
-            width=18,
-        )
-        open_st_btn.pack(side=tk.LEFT, padx=(0, theme.PADDING_SMALL))
-
-        settings_btn = SecondaryButton(
-            site_btn_row,
-            text=t("btn_settings"),
-            command=self._open_settings,
-            width=16,
-        )
-        settings_btn.pack(side=tk.LEFT)
-
-        # ─── 4. Yedek Ekle Kartı (Sadece Merkez düğüm için) ─────────
-        self.node_manager_card = CardFrame(content, padx=16, pady=12, border_color=theme.ACCENT_COLOR)
-
-        node_row = tk.Frame(self.node_manager_card, bg=theme.BG_SECONDARY)
-        node_row.pack(fill=tk.X)
-
-        add_node_btn = PrimaryButton(
-            node_row,
+        self.add_node_btn = PrimaryButton(
+            self.primary_actions_grid,
             text=t("btn_add_node"),
             command=self._open_node_manager,
-            width=22,
         )
-        add_node_btn.pack(side=tk.RIGHT, padx=(theme.PADDING_SMALL, 0))
+        self.add_node_btn.grid(row=0, column=1, sticky="ew", padx=(6, 0), pady=(0, 6))
 
-        node_manager_desc = StyledLabel(
-            node_row,
-            text=t("finish_device_id_desc"),
-            font=theme.FONT_SMALL_BOLD,
-            fg=theme.FG_COLOR,
-            bg=theme.BG_SECONDARY,
-            wraplength=500,
-            justify=tk.LEFT,
-            anchor=tk.W,
+        self.open_st_btn = SecondaryButton(
+            self.primary_actions_grid,
+            text=t("btn_open_syncthing"),
+            command=self._open_syncthing_ui,
         )
-        node_manager_desc.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.open_st_btn.grid(row=1, column=0, sticky="ew", padx=(0, 6))
 
-        # ─── Alt Butonlar (Ana Ekran & Kapat) ───────────────────────
+        self.settings_btn = SecondaryButton(
+            self.primary_actions_grid,
+            text=t("btn_settings"),
+            command=self._open_settings,
+        )
+        self.settings_btn.grid(row=1, column=1, sticky="ew", padx=(6, 0))
+
+        # Yedek düğüm için 1x3 dengeli buton grid'i
+        self.secondary_actions_grid = tk.Frame(self.actions_card, bg=theme.BG_SECONDARY)
+        for col in range(3):
+            self.secondary_actions_grid.grid_columnconfigure(col, weight=1, uniform="s_act")
+
+        PrimaryButton(
+            self.secondary_actions_grid,
+            text=t("btn_open_site_browser"),
+            command=self._open_website,
+        ).grid(row=0, column=0, sticky="ew", padx=(0, 6))
+
+        SecondaryButton(
+            self.secondary_actions_grid,
+            text=t("btn_open_syncthing"),
+            command=self._open_syncthing_ui,
+        ).grid(row=0, column=1, sticky="ew", padx=6)
+
+        SecondaryButton(
+            self.secondary_actions_grid,
+            text=t("btn_settings"),
+            command=self._open_settings,
+        ).grid(row=0, column=2, sticky="ew", padx=(6, 0))
+
+        # ─── Alt Butonlar (Kurulum Sihirbazı & Kapat) ───────────────
         footer = tk.Frame(content, bg=theme.BG_COLOR)
-        footer.pack(fill=tk.X, side=tk.BOTTOM, pady=(4, 6))
+        footer.pack(fill=tk.X, side=tk.BOTTOM, pady=(4, 4))
 
         home_btn = SecondaryButton(
             footer,
-            text=t("btn_home"),
+            text=t("btn_reinstall_wizard"),
             command=self._go_home,
-            width=14,
+            width=18,
         )
         home_btn.pack(side=tk.LEFT)
 
@@ -282,8 +321,8 @@ class FinishPage(BasePage):
         box = tk.Frame(
             self.health_grid,
             bg=theme.ENTRY_BG,
-            padx=12,
-            pady=8,
+            padx=10,
+            pady=7,
             highlightthickness=1,
             highlightbackground=theme.CARD_BORDER,
             highlightcolor=theme.CARD_BORDER,
@@ -302,12 +341,42 @@ class FinishPage(BasePage):
         status_lbl = StyledLabel(
             box,
             text=t("finish_loading"),
-            font=theme.FONT_NORMAL_BOLD,
+            font=theme.FONT_SMALL_BOLD,
             fg=theme.FG_SECONDARY,
             bg=theme.ENTRY_BG,
         )
-        status_lbl.pack(anchor=tk.W, pady=(3, 0))
+        status_lbl.pack(anchor=tk.W, pady=(2, 0))
         return box, status_lbl
+
+    def _restart_services(self) -> None:
+        """Tüm AHWS servislerini arka planda yeniden başlatır ve durumu günceller."""
+        if not self.controller or not hasattr(self.controller, "installer_engine"):
+            return
+
+        self.restart_svc_btn.set_state("disabled")
+        self.restart_svc_btn.config(text=t("msg_restarting_services"))
+
+        def _worker():
+            try:
+                health = self.controller.installer_engine.restart_all_services()
+                if self.winfo_exists():
+                    self.after(0, lambda: self._on_restart_done(health))
+            except Exception as e:
+                logger.warning(f"Servisler yeniden başlatılırken hata: {e}")
+                if self.winfo_exists():
+                    self.after(0, lambda: self._on_restart_done(None))
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _on_restart_done(self, health: dict | None) -> None:
+        if not self.winfo_exists():
+            return
+        self.restart_svc_btn.set_state("normal")
+        self.restart_svc_btn.config(text=t("btn_restart_services"))
+        if health:
+            self._apply_health_ui(health)
+        else:
+            self.refresh_health_status()
 
     def _open_website(self) -> None:
         """Yerel web sitesini veya ayarlanmışsa internet sitesini varsayılan tarayıcıda açar."""
@@ -351,12 +420,12 @@ class FinishPage(BasePage):
 
         SettingsDialog(self, self.controller)
 
-    def _flash_button_copied(self, btn: SecondaryButton, original_key: str) -> None:
+    def _flash_button_copied(self, btn, original_key: str) -> None:
         """Kopyala butonunda 2 saniyeliğine yeşil '✓ Kopyalandı' geri bildirimi gösterir."""
-        btn.config(text=t("btn_copied_inline"), fg=theme.SUCCESS_COLOR)
+        btn.config(text=t("btn_copied_inline"))
         self.after(
             2000,
-            lambda: btn.config(text=t(original_key), fg=theme.FG_COLOR) if btn.winfo_exists() else None,
+            lambda: btn.config(text=t(original_key)) if btn.winfo_exists() else None,
         )
 
     def _copy_device_id(self) -> None:
@@ -380,7 +449,7 @@ class FinishPage(BasePage):
         NodeManagerDialog(self, self.controller)
 
     def _go_home(self) -> None:
-        """Hoşgeldiniz ekranına döner."""
+        """Hoşgeldiniz / Kurulum sihirbazı ekranına döner."""
         if self.controller:
             self.controller.go_to_page("welcome")
 
@@ -395,19 +464,25 @@ class FinishPage(BasePage):
             self.device_id_label.config(text=device_id)
 
     def set_node_role(self, role: str) -> None:
-        """Node rolünü ayarlar. 'secondary' ise Yedek Ekle kartını ve Join Key'i gizler."""
+        """Node rolünü ayarlar. 'secondary' ise Yedek Ekle butonunu ve Join Key'i gizler."""
         self.node_role = role
         if role == "secondary":
-            self.node_manager_card.pack_forget()
+            self.role_badge.config(text=f"● {t('role_badge_secondary')}", fg=theme.WARNING_COLOR)
             self.join_key_frame.pack_forget()
+            self.primary_actions_grid.pack_forget()
+            self.secondary_actions_grid.pack(fill=tk.X)
             self.device_id_hint.config(
                 text=t("finish_secondary_hint"),
                 fg=theme.WARNING_COLOR,
             )
         else:
-            self.node_manager_card.pack(fill=tk.X, pady=(0, 8))
+            self.role_badge.config(text=f"● {t('role_badge_primary')}", fg=theme.ACCENT_COLOR)
+            self.secondary_actions_grid.pack_forget()
+            self.primary_actions_grid.pack(fill=tk.X)
             if self.join_key:
-                self.join_key_frame.pack(fill=tk.X, pady=(8, 0))
+                preview = self.join_key if len(self.join_key) <= 58 else f"{self.join_key[:55]}..."
+                self.join_key_preview.config(text=preview)
+                self.join_key_frame.pack(fill=tk.X, before=self.device_id_hint)
             else:
                 self.join_key_frame.pack_forget()
             self.device_id_hint.config(
@@ -440,8 +515,14 @@ class FinishPage(BasePage):
             return
 
         # 1. Caddy
+        port = health.get("caddy_port", 80)
         if health.get("caddy_running"):
-            self._set_box_state(self.caddy_box, self.caddy_status_lbl, t("health_running"), theme.SUCCESS_COLOR)
+            self._set_box_state(
+                self.caddy_box,
+                self.caddy_status_lbl,
+                f"{t('health_running')} (:{port})",
+                theme.SUCCESS_COLOR,
+            )
         else:
             self._set_box_state(self.caddy_box, self.caddy_status_lbl, t("health_stopped"), theme.ERROR_COLOR)
 
@@ -495,6 +576,14 @@ class FinishPage(BasePage):
         """Sayfaya girildiğinde verileri yükle ve canlı izlemeyi başlat."""
         self._is_active = True
         if self.controller:
+            # Eğer kurulumdan hemen sonra gelindiyse başlığı "Kurulum Tamamlandı!",
+            # doğrudan kontrol paneli olarak açıldıysa "AHWS Canlı Yönetim ve Durum Paneli" yap
+            just_installed = len(getattr(self.controller, "_page_stack", [])) > 1
+            if just_installed:
+                self.header_title.config(text=t("finish_title"), fg=theme.SUCCESS_COLOR)
+            else:
+                self.header_title.config(text=t("control_center_title"), fg=theme.FG_COLOR)
+
             config = self.controller.build_install_config()
             role = getattr(config, "node_role", "primary")
             role_str = role.value if hasattr(role, "value") else str(role)
@@ -518,9 +607,19 @@ class FinishPage(BasePage):
                 except Exception as e:
                     logger.warning(f"Syncthing servisinden Device ID okunamadı: {e}")
 
-            token = getattr(config, "cloudflare_token", "") or saved.get("cloudflare_token", "")
-            port = getattr(config, "caddy_port", 80) or saved.get("caddy_port", 80)
-            domain = getattr(config, "public_domain", "") or saved.get("public_domain", "")
+            token = saved.get("cloudflare_token", "") or getattr(config, "cloudflare_token", "")
+            port = saved.get("caddy_port", 0) or getattr(config, "caddy_port", 80)
+            domain = saved.get("public_domain", "") or getattr(config, "public_domain", "")
+            site_root = saved.get("site_root_path", "") or getattr(config, "site_root_path", "")
+
+            # Alt başlıkta aktif klasör ve domain özetini göster
+            summary_parts = [t("finish_success_msg")]
+            if site_root:
+                summary_parts.append(f"Klasör: {site_root}")
+            if domain:
+                summary_parts.append(f"Domain: {domain}")
+            self.header_subtitle.config(text="   |   ".join(summary_parts))
+
             if device_id and token and role_str == "primary":
                 try:
                     from core.models import InstallConfig

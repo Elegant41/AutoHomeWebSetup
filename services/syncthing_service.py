@@ -121,7 +121,8 @@ class SyncthingService:
         default_folder_path: Optional[str] = None,
     ) -> Path:
         """
-        Syncthing'in ilk yapılandırmasını üretir ve config.xml'i günceller.
+        Syncthing'in ilk yapılandırmasını üretir veya mevcut config.xml'i
+        eşleşmiş cihazları ve klasörleri koruyarak günceller.
 
         Args:
             home_dir: Syncthing home dizini
@@ -132,8 +133,10 @@ class SyncthingService:
         Returns:
             Path: config.xml yolu
         """
+        import xml.etree.ElementTree as ET
+
         home_dir = home_dir or self.home_dir
-        gui_port = gui_port or self.gui_port
+        gui_port = gui_port or constants.SYNCTHING_GUI_PORT
         api_key = api_key or self.api_key
         self.api_key = api_key
         self._headers["X-API-Key"] = api_key
@@ -141,7 +144,7 @@ class SyncthingService:
         home_dir.mkdir(parents=True, exist_ok=True)
         config_path = home_dir / "config.xml"
 
-        # Port çakışması kontrolü: 8384 meşgulse alternatif kullan
+        # Port çakışması kontrolü: hedef port meşgulse alternatif kullan
         if not is_port_available(gui_port, "127.0.0.1"):
             alt_port = find_available_port(constants.SYNCTHING_GUI_PORT_ALT)
             if alt_port > 0:
@@ -155,6 +158,48 @@ class SyncthingService:
 
         default_dir = Path(default_folder_path) if default_folder_path else constants.SITE_DIR
         default_dir_clean = str(default_dir.resolve()).replace("\\", "/")
+
+        # Eğer geçerli bir config.xml zaten varsa, cihaz ve klasörleri koruyarak güncelle
+        if config_path.exists():
+            try:
+                tree = ET.parse(config_path)
+                root = tree.getroot()
+                if root.tag == "configuration":
+                    gui_el = root.find("gui")
+                    if gui_el is None:
+                        gui_el = ET.SubElement(root, "gui")
+                    gui_el.set("enabled", "true")
+                    gui_el.set("tls", "false")
+
+                    addr_el = gui_el.find("address")
+                    if addr_el is None:
+                        addr_el = ET.SubElement(gui_el, "address")
+                    addr_el.text = f"127.0.0.1:{gui_port}"
+
+                    key_el = gui_el.find("apikey")
+                    if key_el is None:
+                        key_el = ET.SubElement(gui_el, "apikey")
+                    key_el.text = api_key
+
+                    opts_el = root.find("options")
+                    if opts_el is None:
+                        opts_el = ET.SubElement(root, "options")
+                    def_path_el = opts_el.find("defaultFolderPath")
+                    if def_path_el is None:
+                        def_path_el = ET.SubElement(opts_el, "defaultFolderPath")
+                    def_path_el.text = default_dir_clean
+
+                    defaults_el = root.find("defaults")
+                    if defaults_el is not None:
+                        def_folder = defaults_el.find("folder")
+                        if def_folder is not None:
+                            def_folder.set("path", default_dir_clean)
+
+                    tree.write(config_path, encoding="utf-8", xml_declaration=True)
+                    logger.info(f"Mevcut Syncthing yapılandırması korunarak güncellendi: {config_path}")
+                    return config_path
+            except Exception as e:
+                logger.warning(f"Mevcut config.xml ayrıştırılamadı, sıfırdan oluşturuluyor: {e}")
 
         # Modern Syncthing (v2.x - version 52) config.xml şablonu
         config_template = f"""<?xml version="1.0" encoding="utf-8"?>
@@ -200,6 +245,7 @@ class SyncthingService:
         try:
             from utils.platform_utils import run_command
             run_command(["taskkill", "/F", "/IM", "syncthing.exe"])
+            time.sleep(0.3)
         except Exception:
             pass
 
@@ -455,6 +501,41 @@ class SyncthingService:
 
         except requests.RequestException as e:
             raise ServiceError(f"Syncthing cihaz eklenemedi: {e}") from e
+
+    def remove_device(self, device_id: str) -> None:
+        """
+        Syncthing'den belirtilen cihazı ve klasör paylaşımlarındaki referansını kaldırır.
+        """
+        try:
+            devices = self.get_devices()
+            new_devices = [d for d in devices if d.get("deviceID") != device_id]
+            if len(new_devices) != len(devices):
+                requests.put(
+                    f"{self.api_base}/rest/config/devices",
+                    headers=self._headers,
+                    json=new_devices,
+                    timeout=10,
+                ).raise_for_status()
+
+            folders = self.get_folders()
+            updated = False
+            for folder in folders:
+                orig_devs = folder.get("devices", [])
+                filtered_devs = [d for d in orig_devs if d.get("deviceID") != device_id]
+                if len(filtered_devs) != len(orig_devs):
+                    folder["devices"] = filtered_devs
+                    updated = True
+            if updated:
+                requests.put(
+                    f"{self.api_base}/rest/config/folders",
+                    headers=self._headers,
+                    json=folders,
+                    timeout=10,
+                ).raise_for_status()
+
+            logger.info(f"Syncthing cihaz kaldırıldı: {device_id[:12]}...")
+        except requests.RequestException as e:
+            raise ServiceError(f"Syncthing cihaz kaldırılamadı: {e}") from e
 
     # ─── Klasör Paylaşımı ───────────────────────────────────────────
     def get_folders(self) -> list[dict]:
