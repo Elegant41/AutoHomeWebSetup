@@ -11,6 +11,7 @@ from gui.base_page import BasePage
 from gui.widgets import PrimaryButton, SecondaryButton, StyledLabel
 from utils.i18n import t
 from utils.logger import get_logger
+from utils.resource_path import resource_path
 
 logger = get_logger(__name__)
 
@@ -23,9 +24,16 @@ class WelcomePage(BasePage):
     def __init__(self, parent, controller):
         super().__init__(parent, controller)
 
-        # ─── Dil Seçimi ─────────────────────────────────────────────
+        # ─── Logo ───────────────────────────────────────────────────
+        try:
+            self._logo_img = tk.PhotoImage(file=str(resource_path("assets/logo.png")))
+            tk.Label(self, image=self._logo_img, bg=theme.BG_COLOR, bd=0).pack(pady=(14, 0))
+        except Exception as exc:
+            logger.warning(f"Logo yüklenemedi: {exc}")
+
+        # ─── Dil Seçimi (sağ üst köşe) ──────────────────────────────
         lang_frame = tk.Frame(self, bg=theme.BG_COLOR)
-        lang_frame.pack(fill=tk.X, anchor=tk.E, padx=20, pady=10)
+        lang_frame.place(relx=1.0, x=-20, y=12, anchor=tk.NE)
 
         btn_tr = SecondaryButton(
             lang_frame,
@@ -43,9 +51,6 @@ class WelcomePage(BasePage):
         )
         btn_en.pack(side=tk.RIGHT, padx=5)
 
-        # ─── Üst Boşluk ─────────────────────────────────────────────
-        tk.Frame(self, bg=theme.BG_COLOR, height=10).pack(fill=tk.X)
-
         # ─── Başlık ─────────────────────────────────────────────────
         title_label = StyledLabel(
             self,
@@ -54,7 +59,7 @@ class WelcomePage(BasePage):
             fg=theme.ACCENT_COLOR,
             bg=theme.BG_COLOR,
         )
-        title_label.pack(pady=(10, 4))
+        title_label.pack(pady=(4, 4))
 
         subtitle_label = StyledLabel(
             self,
