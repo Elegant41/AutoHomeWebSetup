@@ -26,12 +26,16 @@ class App(tk.Tk):
         super().__init__()
 
         # Pencere yapılandırması
+        from gui import theme
+        from gui.widgets import WizardStepBar
+
         self.title(constants.WINDOW_TITLE)
+        self.configure(bg=theme.BG_COLOR)
         self.geometry(f"{constants.WINDOW_WIDTH}x{constants.WINDOW_HEIGHT}")
         self.minsize(constants.WINDOW_MIN_WIDTH, constants.WINDOW_MIN_HEIGHT)
         self.resizable(True, True)
 
-        # Pencere ikonu
+        # Pencere ikonu ve koyu başlık çubuğu
         try:
             from utils.resource_path import resource_path
             icon_path = resource_path("assets/icon.ico")
@@ -39,6 +43,7 @@ class App(tk.Tk):
                 self.iconbitmap(str(icon_path))
         except Exception:
             pass
+        theme.apply_dark_titlebar(self)
 
         # Merkezde konumlandır
         self._center_window()
@@ -54,8 +59,12 @@ class App(tk.Tk):
         self.log_queue: queue.Queue = queue.Queue()
         setup_gui_logging(self.log_queue)
 
+        # Üst Adım Çubuğu (Stepper Bar)
+        self._step_bar = WizardStepBar(self, self)
+        self._step_bar.pack(fill=tk.X, side=tk.TOP)
+
         # Ana içerik container'ı
-        self._container = tk.Frame(self)
+        self._container = tk.Frame(self, bg=theme.BG_COLOR)
         self._container.pack(fill=tk.BOTH, expand=True)
 
         # Installer engine (worker thread + progress queue)
@@ -128,6 +137,9 @@ class App(tk.Tk):
             if not self._page_stack or self._page_stack[-1] is not page:
                 self._page_stack.append(page)
 
+            if hasattr(self, "_step_bar") and self._step_bar:
+                self._step_bar.set_active_step(name)
+
             if hasattr(page, "on_enter"):
                 page.on_enter()
         except Exception as e:
@@ -181,6 +193,9 @@ class App(tk.Tk):
         try:
             previous.pack(fill=tk.BOTH, expand=True)
             previous.tkraise()
+            prev_name = self._find_page_name(previous)
+            if prev_name and hasattr(self, "_step_bar") and self._step_bar:
+                self._step_bar.set_active_step(prev_name)
             if hasattr(previous, "on_enter"):
                 previous.on_enter()
         except Exception as e:
@@ -230,7 +245,13 @@ class App(tk.Tk):
                 if pname:
                     stack_names.append(pname)
 
-        # Mevcut sayfaları temizle
+        # Mevcut sayfaları ve üst çubuğu temizle
+        if hasattr(self, "_step_bar") and self._step_bar:
+            self._step_bar.destroy()
+        from gui.widgets import WizardStepBar
+        self._step_bar = WizardStepBar(self, self)
+        self._step_bar.pack(fill=tk.X, side=tk.TOP, before=self._container)
+
         for widget in self._container.winfo_children():
             widget.destroy()
 

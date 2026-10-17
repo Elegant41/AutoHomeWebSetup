@@ -99,10 +99,10 @@ DOWNLOAD_CHUNK_SIZE = 8192  # Bayt cinsinden chunk boyutu
 
 # ─── GUI Ayarları ─────────────────────────────────────────────────────
 WINDOW_TITLE = APP_DISPLAY_NAME
-WINDOW_WIDTH = 800
-WINDOW_HEIGHT = 660
-WINDOW_MIN_WIDTH = 700
-WINDOW_MIN_HEIGHT = 600
+WINDOW_WIDTH = 860
+WINDOW_HEIGHT = 720
+WINDOW_MIN_WIDTH = 780
+WINDOW_MIN_HEIGHT = 650
 PAGE_PADDING = 20
 
 # ─── Device ID Regex (Syncthing) ──────────────────────────────────────

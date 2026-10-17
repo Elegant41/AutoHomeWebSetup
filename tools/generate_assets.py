@@ -11,42 +11,103 @@ from PIL import Image, ImageDraw, ImageFont
 
 ASSETS = Path(__file__).resolve().parent.parent / "assets"
 
-BG = (30, 30, 46, 255)        # #1e1e2e
-CARD = (40, 40, 58, 255)      # #28283a
-ACCENT = (137, 180, 250, 255) # #89b4fa
-GREEN = (166, 227, 161, 255)  # #a6e3a1
-FG = (205, 214, 244, 255)     # #cdd6f4
-FG2 = (166, 173, 200, 255)    # #a6adc8
+BG_DARK = (24, 24, 37, 255)      # #181825
+BG = (30, 30, 46, 255)           # #1e1e2e
+CARD = (40, 40, 58, 255)         # #28283a
+SURFACE = (49, 50, 68, 255)      # #313244
+PRIMARY = (30, 102, 245, 255)    # #1e66f5
+ACCENT = (137, 180, 250, 255)    # #89b4fa
+CYAN = (137, 220, 235, 255)      # #89dceb
+GREEN = (166, 227, 161, 255)     # #a6e3a1
+FG = (205, 214, 244, 255)        # #cdd6f4
+FG2 = (166, 173, 200, 255)       # #a6adc8
 SS = 4  # supersampling
 
 
 def draw_mark(size: int) -> Image.Image:
-    """Kare logo işareti: yuvarlak köşeli kart + iki bağlı sunucu düğümü + onay."""
+    """Modern HA Sunucu Kümesi İkonu: Çift sunucu katmanı + aktif durum LED'leri + senkron kalkanı."""
     s = size * SS
     img = Image.new("RGBA", (s, s), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
 
-    d.rounded_rectangle((0, 0, s - 1, s - 1), radius=int(s * 0.22), fill=BG)
+    # Dış squircle gövde
+    pad = int(s * 0.03)
     d.rounded_rectangle(
-        (s * 0.04, s * 0.04, s * 0.96, s * 0.96),
-        radius=int(s * 0.18), outline=ACCENT, width=max(2, int(s * 0.03)),
+        (pad, pad, s - 1 - pad, s - 1 - pad),
+        radius=int(s * 0.24),
+        fill=BG_DARK,
+        outline=ACCENT,
+        width=max(2, int(s * 0.032)),
     )
 
-    # İki sunucu düğümü (primary / secondary) ve aralarında bağlantı
-    r = s * 0.13
-    p1 = (s * 0.30, s * 0.38)
-    p2 = (s * 0.70, s * 0.38)
-    lw = max(2, int(s * 0.035))
-    d.line((p1, p2), fill=ACCENT, width=lw)
-    for (cx, cy), col in ((p1, ACCENT), (p2, GREEN)):
-        d.ellipse((cx - r, cy - r, cx + r, cy + r), fill=col)
-        d.ellipse((cx - r * 0.45, cy - r * 0.45, cx + r * 0.45, cy + r * 0.45), fill=BG)
+    # İç hafif parlak çerçeve
+    in_pad = int(s * 0.09)
+    d.rounded_rectangle(
+        (in_pad, in_pad, s - 1 - in_pad, s - 1 - in_pad),
+        radius=int(s * 0.18),
+        fill=CARD,
+    )
 
-    # Alt: onay işareti (failover hazır)
+    # Üst Sunucu Modülü (Primary Node)
+    rx1, rx2 = int(s * 0.17), int(s * 0.83)
+    ry1_top, ry2_top = int(s * 0.21), int(s * 0.44)
+    d.rounded_rectangle(
+        (rx1, ry1_top, rx2, ry2_top),
+        radius=int(s * 0.06),
+        fill=SURFACE,
+        outline=ACCENT,
+        width=max(2, int(s * 0.022)),
+    )
+    # Üst sunucu LED ve havalandırma çizgileri
+    led_r = int(s * 0.038)
+    led_cx = int(s * 0.27)
+    led_cy_top = (ry1_top + ry2_top) // 2
+    d.ellipse((led_cx - led_r, led_cy_top - led_r, led_cx + led_r, led_cy_top + led_r), fill=GREEN)
+    d.rounded_rectangle(
+        (int(s * 0.37), led_cy_top - int(s * 0.018), int(s * 0.73), led_cy_top + int(s * 0.018)),
+        radius=int(s * 0.01),
+        fill=ACCENT,
+    )
+
+    # Alt Sunucu Modülü (Secondary Failover Node)
+    ry1_bot, ry2_bot = int(s * 0.52), int(s * 0.75)
+    d.rounded_rectangle(
+        (rx1, ry1_bot, rx2, ry2_bot),
+        radius=int(s * 0.06),
+        fill=SURFACE,
+        outline=CYAN,
+        width=max(2, int(s * 0.022)),
+    )
+    led_cy_bot = (ry1_bot + ry2_bot) // 2
+    d.ellipse((led_cx - led_r, led_cy_bot - led_r, led_cx + led_r, led_cy_bot + led_r), fill=GREEN)
+    d.rounded_rectangle(
+        (int(s * 0.37), led_cy_bot - int(s * 0.018), int(s * 0.73), led_cy_bot + int(s * 0.018)),
+        radius=int(s * 0.01),
+        fill=CYAN,
+    )
+
+    # Sağ alt köşe HA Onay Rozeti
+    badge_r = int(s * 0.16)
+    bcx, bcy = int(s * 0.75), int(s * 0.74)
+    d.ellipse(
+        (bcx - badge_r, bcy - badge_r, bcx + badge_r, bcy + badge_r),
+        fill=PRIMARY,
+        outline=BG_DARK,
+        width=max(2, int(s * 0.025)),
+    )
+    # Rozet içi tik işareti
+    lw = max(2, int(s * 0.036))
     d.line(
-        ((s * 0.36, s * 0.68), (s * 0.46, s * 0.78), (s * 0.64, s * 0.58)),
-        fill=GREEN, width=int(lw * 1.4), joint="curve",
+        (
+            (bcx - int(badge_r * 0.42), bcy + int(badge_r * 0.02)),
+            (bcx - int(badge_r * 0.08), bcy + int(badge_r * 0.36)),
+            (bcx + int(badge_r * 0.46), bcy - int(badge_r * 0.32)),
+        ),
+        fill=GREEN,
+        width=lw,
+        joint="curve",
     )
+
     return img.resize((size, size), Image.LANCZOS)
 
 
@@ -60,32 +121,34 @@ def get_font(px: int, bold: bool = True):
 
 
 def make_logo() -> Image.Image:
-    """200x100: işaret + AHWS yazısı (şeffaf arka plan)."""
-    w, h = 200 * SS, 100 * SS
-    img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    mark = draw_mark(88).resize((88 * SS, 88 * SS), Image.LANCZOS)
-    img.paste(mark, (6 * SS, 6 * SS), mark)
+    """220x76 kompakt yatay marka logosu (Hoşgeldiniz ekranı için, #1e1e2e arkaplan uyumlu)."""
+    w, h = 220 * SS, 76 * SS
+    img = Image.new("RGBA", (w, h), BG)
+    mark = draw_mark(68).resize((68 * SS, 68 * SS), Image.LANCZOS)
+    img.paste(mark, (4 * SS, 4 * SS), mark)
     d = ImageDraw.Draw(img)
-    d.text((104 * SS, 26 * SS), "AHWS", font=get_font(26 * SS), fill=ACCENT)
-    d.text((105 * SS, 60 * SS), "High Availability", font=get_font(10 * SS, False), fill=FG2)
-    return img.resize((200, 100), Image.LANCZOS)
+    d.text((82 * SS, 10 * SS), "AHWS", font=get_font(30 * SS, True), fill=FG)
+    d.text((84 * SS, 46 * SS), "HIGH AVAILABILITY", font=get_font(11 * SS, True), fill=ACCENT)
+    return img.resize((220, 76), Image.LANCZOS)
 
 
 def make_banner() -> Image.Image:
-    """800x200 sihirbaz banner'ı."""
-    w, h = 800 * SS, 200 * SS
-    img = Image.new("RGBA", (w, h), BG)
+    """760x110 modern sihirbaz üst banner görseli."""
+    w, h = 760 * SS, 110 * SS
+    img = Image.new("RGBA", (w, h), CARD)
     d = ImageDraw.Draw(img)
-    d.rectangle((0, h - 6 * SS, w, h), fill=ACCENT)
-    mark = draw_mark(150).resize((150 * SS, 150 * SS), Image.LANCZOS)
-    img.paste(mark, (30 * SS, 25 * SS), mark)
-    d.text((210 * SS, 45 * SS), "AutoHome Web Setup", font=get_font(52 * SS), fill=ACCENT)
+    # Alt vurgu çizgisi
+    d.rectangle((0, h - 3 * SS, w, h), fill=PRIMARY)
+    mark = draw_mark(82).resize((82 * SS, 82 * SS), Image.LANCZOS)
+    img.paste(mark, (22 * SS, 14 * SS), mark)
+    d.text((122 * SS, 20 * SS), "AutoHome Web Setup", font=get_font(30 * SS, True), fill=FG)
     d.text(
-        (212 * SS, 115 * SS),
-        "Ileri > Ileri > Kur  -  Otomatik Failover Web Sunucusu",
-        font=get_font(22 * SS, False), fill=FG2,
+        (124 * SS, 62 * SS),
+        "Otonom Yedekli (Failover) Web Sunucusu Kurulum Sihirbazi",
+        font=get_font(15 * SS, False),
+        fill=ACCENT,
     )
-    return img.resize((800, 200), Image.LANCZOS)
+    return img.resize((760, 110), Image.LANCZOS)
 
 
 def main() -> None:

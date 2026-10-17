@@ -1,26 +1,28 @@
 """
 Kurulum ilerleme sayfası.
 
-ProgressBar, durum etiketi, log alanı ve iptal butonu içerir.
-InstallerEngine ile thread-safe queue üzerinden iletişim kurar.
+5 aşamalı görsel bileşen durumu (NSSM, Caddy, Cloudflared, Syncthing, Güvenlik Duvarı),
+ProgressBar, renkli terminal log alanı ve iptal/tekrar dene yönetimi içerir.
 """
 
 import queue
 import tkinter as tk
+from tkinter import ttk
 
 from gui import theme
 from gui.base_page import BasePage
 from gui.dialogs.error_dialog import ErrorDialog
 from gui.widgets import (
     CardFrame,
+    HeaderFrame,
     PrimaryButton,
     SecondaryButton,
     StyledLabel,
     StyledProgressbar,
     StyledText,
 )
-from utils.logger import get_logger
 from utils.i18n import t
+from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -30,60 +32,83 @@ class InstallPage(BasePage):
 
     PAGE_NAME = "install"
 
+    STAGE_THRESHOLDS = [
+        ("stage_nssm", 5, 10),
+        ("stage_caddy", 10, 35),
+        ("stage_cloudflared", 35, 60),
+        ("stage_syncthing", 60, 88),
+        ("stage_firewall", 88, 100),
+    ]
+
     def __init__(self, parent, controller):
         super().__init__(parent, controller)
 
-        # Faz 8: InstallerEngine bağlantısı
         self.engine = None
         self.progress_queue: queue.Queue | None = None
         self._is_running = False
         self._last_device_id = ""
+        self._stage_labels: list[tk.Label] = []
 
         self._build_ui()
 
-    # ─── UI Oluşturma ──────────────────────────────────────────────
     def _build_ui(self) -> None:
         """Sayfa arayüzünü oluşturur."""
-        # ─── Başlık ─────────────────────────────────────────────
-        header = tk.Frame(self, bg=theme.BG_COLOR)
-        header.pack(fill=tk.X, padx=theme.PADDING_LARGE, pady=(theme.PADDING_LARGE, theme.PADDING_MEDIUM))
-
-        title_label = StyledLabel(
-            header,
-            text=t("install_title"),
-            font=theme.FONT_TITLE,
-            fg=theme.FG_COLOR,
-            bg=theme.BG_COLOR,
+        header = HeaderFrame(
+            self,
+            title=t("install_title"),
+            subtitle=t("install_subtitle"),
         )
-        title_label.pack(anchor=tk.W)
+        header.pack(fill=tk.X, padx=theme.PADDING_LARGE, pady=(16, 8))
 
-        subtitle_label = StyledLabel(
-            header,
-            text=t("install_subtitle"),
-            font=theme.FONT_NORMAL,
-            fg=theme.FG_SECONDARY,
-            bg=theme.BG_COLOR,
-            wraplength=600,
-            justify=tk.LEFT,
-        )
-        subtitle_label.pack(anchor=tk.W, pady=(theme.PADDING_XS, 0))
-
-        # ─── İçerik ─────────────────────────────────────────────
         content = tk.Frame(self, bg=theme.BG_COLOR)
-        content.pack(fill=tk.BOTH, expand=True, padx=theme.PADDING_LARGE, pady=theme.PADDING_MEDIUM)
+        content.pack(fill=tk.BOTH, expand=True, padx=theme.PADDING_LARGE, pady=(0, 8))
 
-        # ─── Durum Kartı ────────────────────────────────────────
-        status_card = CardFrame(content)
-        status_card.pack(fill=tk.X, pady=(0, theme.PADDING_MEDIUM))
+        # ─── Durum & 5 Aşamalı İlerleme Kartı ───────────────────
+        status_card = CardFrame(content, padx=16, pady=12)
+        status_card.pack(fill=tk.X, pady=(0, 10))
+
+        # 5 Aşamalı Bileşen Göstergesi
+        stages_row = tk.Frame(status_card, bg=theme.BG_SECONDARY)
+        stages_row.pack(fill=tk.X, pady=(0, 10))
+        for col in range(5):
+            stages_row.grid_columnconfigure(col, weight=1, uniform="stage_col")
+
+        self._stage_labels.clear()
+        for idx, (stage_key, _, _) in enumerate(self.STAGE_THRESHOLDS):
+            pad_l = 0 if idx == 0 else 3
+            pad_r = 0 if idx == 4 else 3
+            lbl = tk.Label(
+                stages_row,
+                text=t(stage_key),
+                font=theme.FONT_SMALL_BOLD,
+                fg=theme.FG_DISABLED,
+                bg=theme.BG_TERTIARY,
+                padx=8,
+                pady=5,
+            )
+            lbl.grid(row=0, column=idx, sticky="ew", padx=(pad_l, pad_r))
+            self._stage_labels.append(lbl)
+
+        status_row = tk.Frame(status_card, bg=theme.BG_SECONDARY)
+        status_row.pack(fill=tk.X, pady=(0, 6))
 
         self.status_label = StyledLabel(
-            status_card,
+            status_row,
             text=t("install_preparing"),
             font=theme.FONT_MEDIUM,
             fg=theme.FG_COLOR,
             bg=theme.BG_SECONDARY,
         )
-        self.status_label.pack(anchor=tk.W, pady=(0, theme.PADDING_MEDIUM))
+        self.status_label.pack(side=tk.LEFT)
+
+        self.percent_label = StyledLabel(
+            status_row,
+            text="%0",
+            font=theme.FONT_MEDIUM,
+            fg=theme.ACCENT_COLOR,
+            bg=theme.BG_SECONDARY,
+        )
+        self.percent_label.pack(side=tk.RIGHT)
 
         self.progress_bar = StyledProgressbar(
             status_card,
@@ -92,17 +117,8 @@ class InstallPage(BasePage):
         )
         self.progress_bar.pack(fill=tk.X)
 
-        self.percent_label = StyledLabel(
-            status_card,
-            text="%0",
-            font=theme.FONT_SMALL,
-            fg=theme.FG_SECONDARY,
-            bg=theme.BG_SECONDARY,
-        )
-        self.percent_label.pack(anchor=tk.E, pady=(theme.PADDING_XS, 0))
-
-        # ─── Log Kartı ──────────────────────────────────────────
-        log_card = CardFrame(content)
+        # ─── Renkli Terminal Log Kartı ──────────────────────────
+        log_card = CardFrame(content, padx=16, pady=12)
         log_card.pack(fill=tk.BOTH, expand=True)
 
         log_title = StyledLabel(
@@ -112,31 +128,39 @@ class InstallPage(BasePage):
             fg=theme.FG_COLOR,
             bg=theme.BG_SECONDARY,
         )
-        log_title.pack(anchor=tk.W, pady=(0, theme.PADDING_SMALL))
+        log_title.pack(anchor=tk.W, pady=(0, 6))
+
+        log_container = tk.Frame(log_card, bg=theme.LOG_BG)
+        log_container.pack(fill=tk.BOTH, expand=True)
+
+        scrollbar = ttk.Scrollbar(log_container, orient=tk.VERTICAL)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
         self.log_text = StyledText(
-            log_card,
+            log_container,
             width=theme.LOG_WIDTH,
-            height=12,
+            height=11,
+            yscrollcommand=scrollbar.set,
         )
-        self.log_text.pack(fill=tk.BOTH, expand=True)
+        self.log_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.config(command=self.log_text.yview)
 
         # ─── Alt Butonlar ───────────────────────────────────────
         self.footer = tk.Frame(content, bg=theme.BG_COLOR)
-        self.footer.pack(fill=tk.X, side=tk.BOTTOM, pady=theme.PADDING_MEDIUM)
+        self.footer.pack(fill=tk.X, side=tk.BOTTOM, pady=(10, 8))
 
         self.back_btn = SecondaryButton(
             self.footer,
             text=t("btn_back"),
             command=self.prev_page,
-            width=12,
+            width=14,
         )
 
         self.cancel_btn = SecondaryButton(
             self.footer,
             text=t("btn_cancel"),
             command=self._on_cancel,
-            width=12,
+            width=14,
         )
         self.cancel_btn.pack(side=tk.RIGHT)
 
@@ -144,17 +168,42 @@ class InstallPage(BasePage):
             self.footer,
             text=t("btn_retry"),
             command=self.start_installation,
-            width=14,
+            width=16,
         )
 
-    # ─── Engine Bağlantısı ──────────────────────────────────────────
+    def _update_stage_pills(self, percentage: int) -> None:
+        """Yüzde ilerlemesine göre 5 aşama kutusunu renklendirir."""
+        for idx, (stage_key, start_pct, end_pct) in enumerate(self.STAGE_THRESHOLDS):
+            if idx >= len(self._stage_labels):
+                break
+            lbl = self._stage_labels[idx]
+            base_text = t(stage_key)
+            short_title = base_text.split(".", 1)[-1].strip()
+            if percentage >= end_pct:
+                lbl.config(
+                    text=f"✓ {short_title}",
+                    fg=theme.SUCCESS_COLOR,
+                    bg=theme.BG_TERTIARY,
+                )
+            elif percentage >= start_pct:
+                lbl.config(
+                    text=f"● {short_title}",
+                    fg=theme.BUTTON_TEXT,
+                    bg=theme.BUTTON_PRIMARY_BG,
+                )
+            else:
+                lbl.config(
+                    text=base_text,
+                    fg=theme.FG_DISABLED,
+                    bg=theme.BG_TERTIARY,
+                )
+
     def set_engine(self, engine) -> None:
         """InstallerEngine referansını bağlar."""
         self.engine = engine
         self.progress_queue = engine.progress_queue
         logger.debug("InstallerEngine kurulum sayfasına bağlandı")
 
-    # ─── Yardımcı Metotlar ──────────────────────────────────────────
     def _on_cancel(self) -> None:
         """Kurulumu iptal et."""
         if self.engine and self._is_running:
@@ -168,6 +217,7 @@ class InstallPage(BasePage):
         if value >= 0:
             self.progress_bar.set_progress(value)
             self.percent_label.config(text=f"%{value}")
+            self._update_stage_pills(value)
         self.status_label.config(text=message)
         self.log_text.append_text(f"✓ {message}")
 
@@ -180,12 +230,13 @@ class InstallPage(BasePage):
         self.status_label.config(text=t("install_preparing"), fg=theme.FG_COLOR)
         self.progress_bar.set_progress(0)
         self.percent_label.config(text="%0")
+        self._update_stage_pills(0)
 
         if self.engine:
             self._is_running = True
             self.log_text.clear()
             config = self.controller.build_install_config()
-            self.log_text.append_text(t("install_preparing"))
+            self.log_text.append_text(f"● {t('install_preparing')}")
             self.engine.start(config)
             self._poll_progress()
 
@@ -210,7 +261,6 @@ class InstallPage(BasePage):
         except queue.Empty:
             pass
 
-        # 100ms sonra tekrar kontrol et
         if self._is_running:
             self.after(100, self._poll_progress)
 
@@ -236,10 +286,10 @@ class InstallPage(BasePage):
         self.status_label.config(text=t("install_complete"), fg=theme.SUCCESS_COLOR)
         self.progress_bar.set_progress(100)
         self.percent_label.config(text="%100")
+        self._update_stage_pills(100)
         self.log_text.append_text(f"\n{t('install_complete_log')}")
         self.cancel_btn.set_state("disabled")
 
-        # Bitiş sayfasına geç
         self.after(800, self._go_to_finish)
 
     def _on_cancelled(self) -> None:
@@ -260,7 +310,6 @@ class InstallPage(BasePage):
         """Uygulamayı kapatır."""
         self.controller.destroy()
 
-    # ─── BasePage Override'ları ─────────────────────────────────────
     def on_enter(self) -> None:
         """Sayfaya girildiğinde kurulumu başlat."""
         self.start_installation()

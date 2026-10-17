@@ -34,6 +34,17 @@ def main() -> int:
 
     # Ana uygulamayı başlat
     try:
+        if sys.platform == "win32":
+            try:
+                import ctypes
+                ctypes.windll.shcore.SetProcessDpiAwareness(1)
+            except Exception:
+                try:
+                    import ctypes
+                    ctypes.windll.user32.SetProcessDPIAware()
+                except Exception:
+                    pass
+
         from app import App
 
         app = App()

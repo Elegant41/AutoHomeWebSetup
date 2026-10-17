@@ -38,32 +38,32 @@ class NodeManagerDialog(tk.Toplevel):
 
         self.controller = controller
         self.title(t("node_dialog_title"))
-        self.geometry("660x500")
+        self.geometry("680x500")
         self.resizable(False, False)
         self.configure(bg=theme.BG_COLOR)
         self.transient(parent)
 
         try:
             from utils.resource_path import resource_path
+
             icon_path = resource_path("assets/icon.ico")
             if icon_path.exists():
                 self.iconbitmap(str(icon_path))
         except Exception:
             pass
+        theme.apply_dark_titlebar(self)
 
         try:
             self.grab_set()
         except Exception:
             pass
 
-        # Pencereyi merkeze konumlandır
         self._center_window()
 
         # ─── İçerik ─────────────────────────────────────────────────
         content = tk.Frame(self, bg=theme.BG_COLOR, padx=theme.PADDING_LARGE, pady=theme.PADDING_LARGE)
         content.pack(fill=tk.BOTH, expand=True)
 
-        # ─── Başlık ─────────────────────────────────────────────────
         title_label = StyledLabel(
             content,
             text=t("node_dialog_title"),
@@ -71,7 +71,7 @@ class NodeManagerDialog(tk.Toplevel):
             fg=theme.FG_COLOR,
             bg=theme.BG_COLOR,
         )
-        title_label.pack(anchor=tk.W, pady=(0, theme.PADDING_SMALL))
+        title_label.pack(anchor=tk.W, pady=(0, 4))
 
         desc_label = StyledLabel(
             content,
@@ -79,7 +79,7 @@ class NodeManagerDialog(tk.Toplevel):
             font=theme.FONT_NORMAL,
             fg=theme.FG_SECONDARY,
             bg=theme.BG_COLOR,
-            wraplength=600,
+            wraplength=620,
             justify=tk.LEFT,
         )
         desc_label.pack(anchor=tk.W, pady=(0, theme.PADDING_MEDIUM))
@@ -88,6 +88,7 @@ class NodeManagerDialog(tk.Toplevel):
         self.local_device_id = ""
         try:
             from core.config_manager import ConfigManager
+
             saved = ConfigManager().load()
             self.local_device_id = saved.get("local_device_id", "")
         except Exception:
@@ -106,7 +107,7 @@ class NodeManagerDialog(tk.Toplevel):
             local_title = StyledLabel(
                 local_card,
                 text=t("node_dialog_local_id_title"),
-                font=theme.FONT_SMALL,
+                font=theme.FONT_SMALL_BOLD,
                 fg=theme.FG_SECONDARY,
                 bg=theme.BG_SECONDARY,
             )
@@ -115,21 +116,20 @@ class NodeManagerDialog(tk.Toplevel):
             local_row = tk.Frame(local_card, bg=theme.BG_SECONDARY)
             local_row.pack(fill=tk.X, pady=(6, 0))
 
-            # ÖNCE sağdaki Kopyala butonunu pack et ki uzun ID butonu ezmesin
-            copy_btn = SecondaryButton(
+            self.copy_local_btn = SecondaryButton(
                 local_row,
                 text=t("btn_copy"),
                 command=self._copy_local_id,
-                width=10,
+                width=12,
             )
-            copy_btn.pack(side=tk.RIGHT, padx=(theme.PADDING_SMALL, 0))
+            self.copy_local_btn.pack(side=tk.RIGHT, padx=(theme.PADDING_SMALL, 0))
 
             local_id_lbl = StyledLabel(
                 local_row,
                 text=self.local_device_id,
                 font=theme.FONT_MONO_SMALL,
                 fg=theme.ACCENT_COLOR,
-                bg=theme.BG_TERTIARY,
+                bg=theme.ENTRY_BG,
                 padx=8,
                 pady=6,
                 anchor=tk.W,
@@ -137,7 +137,7 @@ class NodeManagerDialog(tk.Toplevel):
             local_id_lbl.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
         # ─── Eklenecek Yedek Device ID Kartı ────────────────────────
-        device_card = CardFrame(content)
+        device_card = CardFrame(content, border_color=theme.ACCENT_COLOR)
         device_card.pack(fill=tk.X, pady=(0, theme.PADDING_MEDIUM))
 
         device_label = StyledLabel(
@@ -149,14 +149,25 @@ class NodeManagerDialog(tk.Toplevel):
         )
         device_label.pack(anchor=tk.W, pady=(0, theme.PADDING_SMALL))
 
+        input_row = tk.Frame(device_card, bg=theme.BG_SECONDARY)
+        input_row.pack(fill=tk.X)
+
+        paste_btn = SecondaryButton(
+            input_row,
+            text=t("btn_paste"),
+            command=self._paste_device_id,
+            width=10,
+        )
+        paste_btn.pack(side=tk.RIGHT, padx=(theme.PADDING_SMALL, 0))
+
         self.device_id_var = tk.StringVar()
         self.device_id_entry = StyledEntry(
-            device_card,
+            input_row,
             textvariable=self.device_id_var,
             font=theme.FONT_MONO_SMALL,
-            width=64,
+            width=54,
         )
-        self.device_id_entry.pack(fill=tk.X, ipady=4)
+        self.device_id_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=4)
 
         self.device_id_hint = StyledLabel(
             device_card,
@@ -168,13 +179,14 @@ class NodeManagerDialog(tk.Toplevel):
             justify=tk.LEFT,
             anchor=tk.W,
         )
-        self.device_id_hint.pack(anchor=tk.W, pady=(theme.PADDING_XS, 0))
+        self.device_id_hint.pack(anchor=tk.W, pady=(6, 0))
+        self.device_id_var.trace_add("write", self._on_device_id_change)
 
         # ─── Durum / Bilgi ──────────────────────────────────────────
         self.status_label = StyledLabel(
             content,
             text="",
-            font=theme.FONT_NORMAL,
+            font=theme.FONT_NORMAL_BOLD,
             fg=theme.FG_SECONDARY,
             bg=theme.BG_COLOR,
             wraplength=600,
@@ -198,30 +210,56 @@ class NodeManagerDialog(tk.Toplevel):
             footer,
             text=t("node_dialog_btn_add"),
             command=self._on_add_clicked,
-            width=16,
+            width=18,
         )
         add_btn.pack(side=tk.RIGHT)
 
-    # ─── Yardımcı Metotlar ──────────────────────────────────────────
     def _copy_local_id(self) -> None:
         """Ana bilgisayarın Device ID'sini panoya kopyalar."""
         if self.local_device_id:
             self.clipboard_clear()
             self.clipboard_append(self.local_device_id)
-            messagebox.showinfo(t("msg_copied_title"), t("msg_copied_device_id"), parent=self)
+            if hasattr(self, "copy_local_btn"):
+                self.copy_local_btn.config(text=t("btn_copied_inline"), fg=theme.SUCCESS_COLOR)
+                self.after(
+                    2000,
+                    lambda: self.copy_local_btn.config(text=t("btn_copy"), fg=theme.FG_COLOR)
+                    if self.copy_local_btn.winfo_exists()
+                    else None,
+                )
+
+    def _paste_device_id(self) -> None:
+        try:
+            clip = self.clipboard_get().strip()
+            if clip:
+                self.device_id_var.set(clip)
+        except Exception:
+            pass
+
+    def _on_device_id_change(self, *_args) -> None:
+        val = self.device_id_var.get().strip().upper()
+        if not val:
+            self.device_id_hint.config(
+                text="Format: AAAAAAA-BBBBBBB-CCCCCCC-DDDDDDD-EEEEEEE-FFFFFFF-GGGGGGG-HHHHHHH",
+                fg=theme.FG_DISABLED,
+            )
+            return
+        if re.match(constants.DEVICE_ID_REGEX, val):
+            self.device_id_hint.config(text=t("sync_device_valid"), fg=theme.SUCCESS_COLOR)
+        else:
+            self.device_id_hint.config(text=t("sync_device_invalid_live"), fg=theme.WARNING_COLOR)
 
     def _center_window(self) -> None:
         """Pencereyi ekranın ortasına konumlandırır."""
         self.update_idletasks()
-        x = (self.winfo_screenwidth() - 660) // 2
+        x = (self.winfo_screenwidth() - 680) // 2
         y = (self.winfo_screenheight() - 500) // 2
         self.geometry(f"+{x}+{y}")
 
     def _on_add_clicked(self) -> None:
         """Ekle butonuna tıklandığında."""
-        device_id = self.device_id_var.get().strip()
+        device_id = self.device_id_var.get().strip().upper()
 
-        # Validasyon
         if not device_id:
             messagebox.showerror(t("msg_invalid_input"), t("err_no_device_id"), parent=self)
             return
@@ -234,16 +272,14 @@ class NodeManagerDialog(tk.Toplevel):
             )
             return
 
-        # Kendi Cihaz ID'sini girmesini engelle
         if self.local_device_id and device_id == self.local_device_id:
             messagebox.showerror(
                 t("msg_invalid_input"),
-                "Kendi bilgisayarınızın Cihaz ID'sini girdiniz. Lütfen YEDEK bilgisayarın Cihaz ID'sini girin.",
+                t("err_self_device_id"),
                 parent=self,
             )
             return
 
-        # Syncthing API ile cihaz ekleme ve klasör paylaşma
         if self.controller:
             engine = getattr(self.controller, "installer_engine", None)
             if engine:
@@ -253,7 +289,6 @@ class NodeManagerDialog(tk.Toplevel):
                         fg=theme.INFO_COLOR,
                     )
                     self.update_idletasks()
-                    # Yedek düğümü Syncthing ağına ekle ve site klasörünü paylaş
                     engine.add_secondary_node(device_id)
                     self.status_label.config(
                         text=t("msg_pairing_ok"),
@@ -261,7 +296,6 @@ class NodeManagerDialog(tk.Toplevel):
                     )
                     self.device_id_entry.delete(0, tk.END)
 
-                    # Bitiş sayfası açıksa canlı sağlık durumunu hemen güncelle
                     finish_page = self.controller._pages.get("finish")
                     if finish_page and hasattr(finish_page, "refresh_health_status"):
                         finish_page.refresh_health_status()
