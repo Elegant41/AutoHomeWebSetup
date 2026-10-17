@@ -1,0 +1,1 @@
+# İş Mantığı Katmanı (Business Logic Layer)
