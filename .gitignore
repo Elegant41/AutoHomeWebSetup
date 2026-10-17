@@ -22,3 +22,22 @@ Thumbs.db
 # Logs and local runtime data
 *.log
 config.json
+
+# Dahili proje planlama / mimari dokumanlari (repoya yuklenmez)
+PROJE_MIMARI_PLANI.md
+*_PLANI.md
+PLAN*.md
+NOTLAR*.md
+notes/
+docs_internal/
+
+# Test / gecici dosyalar
+.pytest_cache/
+.coverage
+htmlcov/
+*.tmp
+*.bak
+
+# Yerel runtime verisi
+syncthing_home/
+install_config.json
