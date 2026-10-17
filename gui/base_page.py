@@ -89,8 +89,9 @@ class BasePage(tk.Frame):
     def _display_error(self, message: str) -> None:
         """Varsayılan hata gösterimi. Alt sınıflar override edebilir."""
         import tkinter.messagebox as messagebox
+        from utils.i18n import t
 
-        messagebox.showerror("Geçersiz Giriş", message, parent=self)
+        messagebox.showerror(t("msg_invalid_input"), message, parent=self)
 
     def _display_info(self, title: str, message: str) -> None:
         """Bilgi mesajı gösterir."""

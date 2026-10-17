@@ -427,15 +427,29 @@ class InstallerEngine:
         http_ok = check_local_http_health(port) if caddy_running else False
 
         paired_devices = 0
+        connected_devices = 0
         if st_running:
             try:
+                self.syncthing_service.sync_credentials_from_config()
+                try:
+                    local_id = self.syncthing_service.get_device_id()
+                except Exception:
+                    local_id = config_data.get("local_device_id", "")
+
                 devices = self.syncthing_service.get_devices()
-                # Kendi cihazımız dışındakileri veya toplam cihazları say
-                local_id = config_data.get("local_device_id", "")
-                paired_devices = len([
-                    d for d in devices
+                remote_ids = [
+                    d.get("deviceID")
+                    for d in devices
                     if d.get("deviceID") and d.get("deviceID") != local_id
-                ])
+                ]
+                paired_devices = len(remote_ids)
+
+                if paired_devices > 0:
+                    conns = self.syncthing_service.get_connections()
+                    connected_devices = sum(
+                        1 for rid in remote_ids
+                        if isinstance(conns.get(rid), dict) and conns[rid].get("connected") is True
+                    )
             except Exception:
                 pass
 
@@ -445,6 +459,7 @@ class InstallerEngine:
             "syncthing_running": st_running,
             "http_ok": http_ok,
             "paired_devices": paired_devices,
+            "connected_devices": connected_devices,
             "caddy_port": port,
         }
 
@@ -482,17 +497,36 @@ class InstallerEngine:
         self.syncthing_service.api_base = f"http://127.0.0.1:{gui_port}"
         self.syncthing_service._headers["X-API-Key"] = api_key
 
-        # Cihazı ekle
-        self.syncthing_service.add_device(device_id, name or "Yedek Düğüm")
+        # Cihazı ekle (karşılıklı klasör paylaşımının takılmaması için auto_accept=True)
+        self.syncthing_service.add_device(device_id, name or "Yedek Düğüm", auto_accept=True)
 
         # Site klasörünü paylaş
         site_root = config_data.get("site_root_path", "")
-        if site_root:
-            self.syncthing_service.share_folder(
-                folder_id="auto-home-web",
-                folder_path=site_root,
-                device_ids=[device_id],
-                label="AHWS Web Site",
-            )
+        if not site_root:
+            try:
+                for f in self.syncthing_service.get_folders():
+                    if f.get("id") == "auto-home-web" and f.get("path"):
+                        site_root = f["path"]
+                        break
+            except Exception:
+                pass
+        if not site_root:
+            site_root = str(constants.SITE_DIR)
+
+        self.syncthing_service.share_folder(
+            folder_id="auto-home-web",
+            folder_path=site_root,
+            device_ids=[device_id],
+            label="AHWS Web Site",
+        )
+
+        try:
+            sec_ids = list(config_data.get("secondary_device_ids", []))
+            if device_id not in sec_ids:
+                sec_ids.append(device_id)
+            config_data["secondary_device_ids"] = sec_ids
+            self.config_manager.save(config_data)
+        except Exception:
+            pass
 
         logger.info(f"Yedek düğüm eklendi: {device_id[:12]}...")

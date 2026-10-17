@@ -606,6 +606,21 @@ class SyncthingService:
         except Exception as e:
             logger.warning(f"Syncthing klasör yolu güncellenemedi: {e}")
 
+    def get_connections(self) -> dict:
+        """Uzak cihazların canlı bağlantı durumlarını döndürür (/rest/system/connections)."""
+        try:
+            self.sync_credentials_from_config()
+            response = requests.get(
+                f"{self.api_base}/rest/system/connections",
+                headers=self._headers,
+                timeout=5,
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data.get("connections", {}) if isinstance(data, dict) else {}
+        except requests.RequestException:
+            return {}
+
     def get_sync_status(self) -> dict:
         """Senkronizasyon durumunu döndürür."""
         try:

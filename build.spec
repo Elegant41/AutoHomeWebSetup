@@ -57,18 +57,14 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
+        # NOT: 'inspect' (dataclasses buna bağımlı), 'pdb', 'doctest', 'pydoc'
+        # stdlib içinde zincirleme import edildiği için exclude EDİLMEMELİDİR.
         'unittest',
         'test',
-        'pdb',
         'py_compile',
-        'doctest',
-        'inspect',
-        'pydoc',
         'turtle',
         'turtledemo',
         'venv',
-        '__pycache__',
-        '*.pyc',
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,

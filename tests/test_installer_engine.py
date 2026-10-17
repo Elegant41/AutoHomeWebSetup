@@ -262,6 +262,60 @@ class TestInstallerFixesAndImprovements(unittest.TestCase):
         engine.caddy_service.uninstall.assert_called_once()
         engine.config_manager.delete.assert_called_once()
 
+    def test_get_system_health_returns_connected_and_paired_devices(self):
+        """get_system_health() hem eslesmis hem de aktif bagli dugum sayisini dondurmeli."""
+        engine = InstallerEngine()
+        local_id = "LOCAL11-LOCAL11-LOCAL11-LOCAL11-LOCAL11-LOCAL11-LOCAL11-LOCAL11"
+        remote_id = "REMOTE2-REMOTE2-REMOTE2-REMOTE2-REMOTE2-REMOTE2-REMOTE2-REMOTE2"
+
+        engine.config_manager.load = MagicMock(return_value={"caddy_port": 80})
+        engine.caddy_service.is_running = MagicMock(return_value=True)
+        engine.cloudflare_service.is_running = MagicMock(return_value=True)
+        engine.syncthing_service.is_running = MagicMock(return_value=True)
+        engine.syncthing_service.sync_credentials_from_config = MagicMock()
+        engine.syncthing_service.get_device_id = MagicMock(return_value=local_id)
+        engine.syncthing_service.get_devices = MagicMock(return_value=[
+            {"deviceID": local_id, "name": "Local"},
+            {"deviceID": remote_id, "name": "Remote"},
+        ])
+        engine.syncthing_service.get_connections = MagicMock(return_value={
+            remote_id: {"connected": True}
+        })
+
+        health = engine.get_system_health()
+        self.assertTrue(health["caddy_running"])
+        self.assertTrue(health["cloudflared_running"])
+        self.assertTrue(health["syncthing_running"])
+        self.assertEqual(health["paired_devices"], 1)
+        self.assertEqual(health["connected_devices"], 1)
+
+    def test_add_secondary_node_uses_auto_accept_and_saves_config(self):
+        """add_secondary_node() auto_accept=True ile cihaz eklemeli ve klasoru paylasmali."""
+        engine = InstallerEngine()
+        sec_id = "SECOND2-SECOND2-SECOND2-SECOND2-SECOND2-SECOND2-SECOND2-SECOND2"
+
+        engine.syncthing_service.sync_credentials_from_config = MagicMock()
+        engine.syncthing_service.is_api_ready = MagicMock(return_value=True)
+        engine.syncthing_service.add_device = MagicMock()
+        engine.syncthing_service.share_folder = MagicMock()
+        engine.config_manager.load = MagicMock(return_value={"site_root_path": "C:/test_site"})
+        engine.config_manager.save = MagicMock()
+
+        engine.add_secondary_node(sec_id, "Yedek-1")
+
+        engine.syncthing_service.add_device.assert_called_once_with(
+            sec_id,
+            "Yedek-1",
+            auto_accept=True,
+        )
+        engine.syncthing_service.share_folder.assert_called_once_with(
+            folder_id="auto-home-web",
+            folder_path="C:/test_site",
+            device_ids=[sec_id],
+            label="AHWS Web Site",
+        )
+        engine.config_manager.save.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

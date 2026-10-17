@@ -41,7 +41,19 @@ class SettingsDialog(tk.Toplevel):
         self.resizable(False, False)
         self.configure(bg=theme.BG_COLOR)
         self.transient(parent)
-        self.grab_set()
+
+        try:
+            from utils.resource_path import resource_path
+            icon_path = resource_path("assets/icon.ico")
+            if icon_path.exists():
+                self.iconbitmap(str(icon_path))
+        except Exception:
+            pass
+
+        try:
+            self.grab_set()
+        except Exception:
+            pass
 
         # Pencereyi merkeze konumlandır
         self._center_window()
@@ -94,12 +106,12 @@ class SettingsDialog(tk.Toplevel):
         folder_row = tk.Frame(folder_card, bg=theme.BG_SECONDARY)
         folder_row.pack(fill=tk.X)
 
+        browse_btn = SecondaryButton(folder_row, text=t("btn_browse"), command=self._browse_folder, width=14)
+        browse_btn.pack(side=tk.RIGHT, padx=(theme.PADDING_SMALL, 0))
+
         self.folder_var = tk.StringVar(value=self.current_settings.get("site_root_path", ""))
         self.folder_entry = StyledEntry(folder_row, textvariable=self.folder_var, width=50)
-        self.folder_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, theme.PADDING_SMALL))
-
-        browse_btn = SecondaryButton(folder_row, text=t("btn_browse"), command=self._browse_folder, width=14)
-        browse_btn.pack(side=tk.RIGHT)
+        self.folder_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
         # ─── Cloudflare Tunnel Token ───
         token_card = CardFrame(content)

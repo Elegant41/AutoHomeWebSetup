@@ -1,6 +1,7 @@
 """
 i18n (Internationalization) Modülü
 Uygulamanın çift dil desteğini (TR/EN) sağlar.
+Windows 10/11 Tkinter GDI font motoruyla %100 uyumlu semboller kullanır.
 """
 
 _CURRENT_LANG = "tr"
@@ -10,124 +11,173 @@ _TRANSLATIONS = {
         # Genel Butonlar
         "btn_next": "İleri ▶",
         "btn_back": "◀ Geri",
-        "btn_copy": "📋 Kopyala",
-        "btn_browse": "📂 Gözat...",
+        "btn_copy": "Kopyala",
+        "btn_copy_join_key": "Katılım Kodunu Kopyala",
+        "btn_browse": "Gözat...",
         "btn_cancel": "İptal",
         "btn_close": "Kapat",
-        "btn_save": "💾 Kaydet",
-        "btn_settings": "⚙️ Ayarlar",
-        "btn_refresh": "🔄 Durumu Yenile",
-        "btn_uninstall": "🗑️ Kurulumu Kaldır",
-        "btn_add_node": "➕ Yedek Ekle",
-        "btn_start_install": "Kurulumu Başlat",
-        "btn_retry": "🔄 Tekrar Dene",
-        "btn_go_to_manage": "🚀 Kurulum Yönetimi & Düğüm Ekle",
-        "btn_reinstall": "⚙️ Sıfırdan Yeniden Kur",
-        "btn_open_site": "🌐 Siteyi Aç (http://localhost)",
-        "btn_open_site_browser": "🌐 Web Sitesini Tarayıcıda Aç",
+        "btn_home": "◀ Ana Ekran",
+        "btn_save": "Kaydet",
+        "btn_settings": "Ayarlar",
+        "btn_refresh": "↻ Durumu Yenile",
+        "btn_refresh_status": "↻ Durumu Yenile",
+        "btn_uninstall": "Kurulumu Kaldır",
+        "btn_add_node": "+ Yedek Bilgisayar Ekle",
+        "btn_start_install": "Kurulumu Başlat ▶",
+        "btn_retry": "↻ Tekrar Dene",
+        "btn_go_to_manage": "Durum Paneli & Yedek Ekle",
+        "btn_go_to_status": "Canlı Durum Paneli",
+        "btn_reinstall": "Sıfırdan Yeniden Kur",
+        "btn_open_site": "Siteyi Tarayıcıda Aç",
+        "btn_open_site_browser": "Web Sitesini Tarayıcıda Aç",
+        "btn_open_logs": "Log Dosyasını Aç",
 
-        # Hoşgeldiniz
+        # Hoşgeldiniz Sayfası
         "welcome_title": "AHWS Setup",
         "welcome_subtitle": "Yüksek Erişilebilirlikli (HA) Statik Web Kurulum Sihirbazı",
         "welcome_desc": (
-            "Bu sihirbaz, Caddy web sunucusu, Cloudflare Tunnel ve Syncthing servislerini otomatik olarak bilgisayarınıza kuracak ve yapılandıracaktır.\n\n"
-            "İlerlemeden önce lütfen gerekli bilgilerin (Cloudflare Token vb.) hazır olduğundan emin olun."
+            "Bu sihirbaz, Caddy web sunucusu, Cloudflare Tunnel ve Syncthing servislerini otomatik olarak "
+            "bilgisayarınıza kuracak ve yapılandıracaktır.\n\n"
+            "İlerlemeden önce lütfen gerekli bilgilerin (Cloudflare Tunnel Token vb.) hazır olduğundan emin olun."
         ),
         "welcome_existing_title": "✓ Mevcut Kurulum Bulundu",
-        "welcome_existing_desc": "Bu bilgisayarda önceden tamamlanmış bir AHWS kurulumu tespit edildi. Tekrar kurulum yapmadan doğrudan yönetim ve düğüm ekleme ekranına geçebilirsiniz.",
+        "welcome_existing_desc": (
+            "Bu bilgisayarda tamamlanmış bir AHWS kurulumu tespit edildi. Tekrar kurulum yapmadan doğrudan "
+            "canlı durum paneline geçebilir veya ayarlarınızı yönetebilirsiniz."
+        ),
         "finish_role": "Düğüm Rolü",
         "install_date_label": "Kurulum Tarihi",
         "device_id_short_label": "Cihaz ID",
+        "welcome_device_id_label": "Cihaz ID",
         "unknown_label": "Bilinmiyor",
+        "welcome_unknown_date": "Bilinmiyor",
         "welcome_warning": "⚠ Bu işlem yönetici hakları gerektirir. Devam etmek için UAC uyarısını onaylayın.",
 
-        # Sunucu Ayarları
+        # Sunucu Ayarları Sayfası
         "server_title": "Sunucu Ayarları",
         "server_subtitle": "Web sitenizin dosyalarının bulunduğu klasörü ve Cloudflare Tunnel token'ınızı girin.",
         "server_folder_title": "Web Sitesi Klasörü",
-        "server_folder_desc": "Statik site dosyalarınızın bulunduğu klasör (Merkez için index.html içermelidir).",
-        "server_folder_secondary_desc": "Yedek düğümde dosyalar Merkez bilgisayardan bu klasöre otomatik eşitlenecektir (index.html şartı aranmaz).",
+        "server_folder_desc": "Statik site dosyalarınızın bulunduğu klasör (Merkez bilgisayar için index.html içermelidir).",
+        "server_folder_secondary_desc": (
+            "Yedek bilgisayarda site dosyaları Merkez bilgisayardan bu klasöre otomatik olarak eşitlenecektir "
+            "(önceden index.html bulunması gerekmez)."
+        ),
         "server_token_title": "Cloudflare Tunnel Token",
-        "server_token_desc": "Cloudflare Zero Trust üzerinden oluşturduğunuz tünel token'ını girin.",
+        "server_token_desc": "Cloudflare Zero Trust panelinden oluşturduğunuz tünel token'ını girin.",
         "server_domain_title": "Site İnternet Adresi (Opsiyonel)",
-        "server_domain_desc": "Cloudflare'de ayarladığınız alan adınızı girerseniz, kurulum sonrası site doğrudan internet üzerinden açılır. (Örn: https://ornek.com)",
-        "server_port_title": "Yerel Caddy Portu",
-        "server_port_desc": "Caddy'nin dinleyeceği yerel port. (Varsayılan: 80)",
-        "server_prevent_sleep": "⚡ Bilgisayar prize takılıyken uyku moduna geçmesini engelle (7/24 HA için önerilir)",
+        "server_domain_desc": (
+            "Cloudflare'de ayarladığınız alan adınızı girerseniz, kurulum sonrası site doğrudan bu adres üzerinden açılır "
+            "(Örn: https://ornek.com)."
+        ),
+        "server_port_title": "Yerel Caddy Portu ve Güç Ayarı",
+        "server_port_desc": "Caddy web sunucusunun dinleyeceği yerel port (Varsayılan: 80).",
+        "server_prevent_sleep": "Bilgisayar prize takılıyken uyku moduna geçmesini engelle (7/24 kesintisiz erişim için önerilir)",
         "server_port_ok": "✓ Port uygun",
-        "server_port_caddy_reinstall": "✓ Port uygun (Mevcut Caddy servisi yenilenecek)",
-        "server_port_in_use": "⚠ Port kullanımda!",
-        "server_port_invalid": "Geçersiz port",
+        "server_port_caddy_reinstall": "✓ Port uygun (Mevcut Caddy servisi güncellenecek)",
+        "server_port_in_use": "⚠ Port başka bir uygulama tarafından kullanılıyor!",
+        "server_port_invalid": "Geçersiz port numarası",
 
         # Sunucu Ayarları Hataları
         "err_no_folder": "Lütfen web sitesi klasörünü seçin.",
         "err_folder_not_found": "Klasör bulunamadı: {folder}",
         "err_no_index": "Seçilen klasörde index.html bulunamadı.\nBeklenen dosya: {index_path}",
         "err_no_token": "Lütfen Cloudflare Tunnel token'ını girin.",
-        "err_invalid_token": "Token formatı geçersiz. Lütfen geçerli bir Cloudflare Tunnel token'ı girin. (eyJ... ile başlayan)",
+        "err_invalid_token": "Token formatı geçersiz. Lütfen geçerli bir Cloudflare Tunnel token'ı girin (eyJ... ile başlayan).",
         "err_port_range": "Port değeri 1-65535 arasında olmalıdır.",
         "err_port_in_use_msg": "Port {port} zaten kullanımda. Lütfen başka bir port seçin.",
 
-        # Senkronizasyon Ayarları
+        # Senkronizasyon Ayarları Sayfası
         "sync_title": "Senkronizasyon (Ağ) Ayarları",
-        "sync_subtitle": "Bu bilgisayarın ağdaki rolünü seçin.",
+        "sync_subtitle": "Bu bilgisayarın yüksek erişilebilirlik (HA) ağındaki rolünü seçin.",
         "sync_role_title": "Bilgisayar Rolü",
-        "sync_role_desc": "Bu bilgisayar ana sunucu mu olacak yoksa yedek mi?",
+        "sync_role_desc": "Bu bilgisayar ana sunucu mu olacak yoksa yedek düğüm mü?",
         "sync_role_primary": "1- Ana Bilgisayar (Merkez)",
         "sync_role_secondary": "2- Yedek Bilgisayar (Node)",
-        "sync_primary_desc": "İlk kurulumu bu bilgisayarda yapıyorsanız Merkez'i seçin.",
+        "sync_primary_desc": "İlk kurulumu bu bilgisayarda yapıyorsanız ve site dosyalarınız buradaysa Merkez'i seçin.",
         "sync_secondary_desc": "Bu bilgisayar Merkez ile senkronize çalışıp yedek (failover) olacaksa Yedek'i seçin.",
-        "sync_join_key_title": "🔑 Hızlı Kurulum: Küme Katılım Kodu (Opsiyonel)",
-        "sync_join_key_desc": "Merkez bilgisayarda üretilen 'AHWS1-...' kodunu yapıştırırsanız Cihaz ID, Cloudflare Token, Port ve Domain otomatik doldurulur!",
+        "sync_join_key_title": "Hızlı Kurulum: Küme Katılım Kodu (Opsiyonel)",
+        "sync_join_key_desc": (
+            "Merkez bilgisayarda üretilen 'AHWS1-...' kodunu buraya yapıştırırsanız Merkez Cihaz ID, "
+            "Cloudflare Token, Port ve Domain otomatik doldurulur!"
+        ),
         "sync_join_key_applied": "✓ Küme Katılım Kodu çözümlendi! Tüm sunucu ayarları otomatik dolduruldu.",
         "sync_join_key_invalid": "⚠ Geçersiz Küme Katılım Kodu formatı.",
+        "err_invalid_join_key": "⚠ Geçersiz Küme Katılım Kodu formatı.",
         "sync_device_title": "Merkez Bilgisayar ID (Syncthing Device ID)",
-        "sync_device_desc": "Merkez bilgisayar kurulumu bittiğinde ekranda gösterilen ID'yi buraya yapıştırın.",
+        "sync_device_desc": "Merkez bilgisayar kurulumu bittiğinde ekranda gösterilen Cihaz ID'yi buraya yapıştırın.",
 
         # Senkronizasyon Hataları
-        "err_no_device_id": "Lütfen Merkez Bilgisayar'ın Syncthing ID'sini veya Küme Katılım Kodunu girin.",
+        "err_no_device_id": "Lütfen Merkez Bilgisayar'ın Syncthing Cihaz ID'sini veya Küme Katılım Kodunu girin.",
         "err_invalid_device_id": "Geçersiz Device ID formatı. Doğru format: AAAAAAA-BBBBBBB-...",
 
         # Kurulum Sayfası
         "install_title": "Kurulum Yapılıyor",
-        "install_subtitle": "Lütfen bekleyin, arka planda servisler indiriliyor ve kuruluyor...",
+        "install_subtitle": "Lütfen bekleyin, arka planda servisler indiriliyor ve yapılandırılıyor...",
         "install_preparing": "Kurulum hazırlanıyor...",
+        "install_log_title": "Kurulum Günlüğü (Log)",
         "install_cancelling": "Kurulum iptal ediliyor...",
-        "install_failed_status": "❌ Kurulum başarısız!",
+        "install_cancelling_log": "⚠ Kurulum iptal ediliyor, yapılan işlemler geri alınıyor...",
+        "install_failed": "✕ Kurulum başarısız!",
+        "install_failed_status": "✕ Kurulum başarısız!",
+        "install_error_prefix": "✕ HATA: {message}",
+        "install_complete": "✓ Kurulum tamamlandı!",
         "install_complete_status": "✓ Kurulum tamamlandı!",
+        "install_complete_log": "✓ Kurulum başarıyla tamamlandı!",
+        "install_cancelled": "⚠ Kurulum iptal edildi.",
+        "install_cancelled_log": "⚠ Kurulum kullanıcı tarafından iptal edildi.",
 
-        # Bitiş Sayfası
-        "finish_title": "Kurulum Tamamlandı! 🎉",
-        "finish_subtitle": "Sistem başarıyla kuruldu ve arka planda çalışıyor.",
-        "finish_success_msg": "Servisler (Caddy, Cloudflared, Syncthing) aktif.",
+        # Bitiş ve Durum Paneli Sayfası
+        "finish_title": "Kurulum Tamamlandı!",
+        "finish_subtitle": "Sistem başarıyla kuruldu ve arka planda servis olarak çalışıyor.",
+        "finish_success_msg": "Servisler (Caddy, Cloudflared, Syncthing) Windows servisi olarak yapılandırıldı.",
         "finish_loading": "(yükleniyor...)",
-        "finish_device_id_title": "Sizin Syncthing Cihaz ID'niz:",
-        "finish_device_id_desc": "Ağdaki diğer cihazların size bağlanması için bu ID gereklidir.",
-        "finish_join_key_title": "🔑 Küme Katılım Kodu (Yedek Bilgisayar İçin Tek Kod):",
-        "finish_join_key_desc": "Yedek bilgisayarı kurarken bu kodu yapıştırarak Token + Device ID + Port ayarlarını tek seferde aktarabilirsiniz.",
-        "finish_primary_hint": "Yedek bilgisayarı (Node) kurarken bu ID'yi veya Küme Katılım Kodunu kullanın. Ardından 'Yedek Ekle' butonuyla o bilgisayarı merkeze tanıtın.",
-        "finish_secondary_hint": "Yedek bilgisayar başarıyla merkeze bağlandı. Dosyalarınız otomatik olarak senkronize edilecektir.",
-        "finish_open_site_desc": "Siteniz Caddy web sunucusu üzerinde yayında! Yedek düğüm eklemeden de siteniz bilgisayarınızda aktiftir.",
+        "finish_device_id_title": "Bu Bilgisayarın Syncthing Cihaz ID'si:",
+        "finish_device_id_desc": "Yedek bilgisayarda kurulum yaptıktan sonra oradaki Cihaz ID'yi buraya ekleyin:",
+        "finish_join_key_title": "Küme Katılım Kodu (AHWS1)",
+        "finish_join_key_desc": "Yedek bilgisayarı tek kodla kurmak için kopyalayın (Token + ID + Port içerir).",
+        "finish_primary_hint": (
+            "1. Adım: Yedek bilgisayarı kurarken aşağıdaki 'Katılım Kodunu' (veya Cihaz ID'nizi) kullanın.\n"
+            "2. Adım: Yedek bilgisayar kurulumu bitince, o bilgisayarın ekranda verdiği Cihaz ID'yi "
+            "aşağıdaki '+ Yedek Bilgisayar Ekle' butonuyla bu bilgisayara ekleyin."
+        ),
+        "finish_secondary_hint": (
+            "ÖNEMLİ SON ADIM: Bu bilgisayar Yedek Düğüm (Node) olarak kuruldu. Dosya eşitlemesinin başlaması için "
+            "yukarıdaki Cihaz ID'nizi kopyalayın ve ANA (Merkez) bilgisayardaki AHWS programında "
+            "'+ Yedek Bilgisayar Ekle' butonuna basarak bu ID'yi ekleyin!"
+        ),
+        "finish_open_site_desc": "Web siteniz Caddy üzerinde yayında! Aşağıdaki butonlarla sitenizi açabilir veya ayarları değiştirebilirsiniz.",
         "msg_copied_title": "Kopyalandı",
         "msg_copied_device_id": "Cihaz ID panoya kopyalandı.",
         "msg_copied_join_key": "Küme Katılım Kodu panoya kopyalandı.",
 
         # Canlı Sağlık Gösterge Paneli (Dashboard)
-        "health_title": "Canlı Sistem Durumu",
-        "health_running": "🟢 Çalışıyor",
-        "health_stopped": "🔴 Durdu",
-        "health_nodes": "Eşleşen Düğüm: {count}",
+        "health_title": "Canlı Sistem ve Servis Durumu",
+        "health_card_title": "Canlı Sistem ve Servis Durumu",
+        "health_col_caddy": "Caddy (Web Sunucu)",
+        "health_col_cloudflared": "Cloudflared (Tünel)",
+        "health_col_syncthing": "Syncthing (Senkron)",
+        "health_col_nodes": "Senkronizasyon Ağı",
+        "health_running": "● Çalışıyor",
+        "health_stopped": "● Durdu",
+        "health_nodes": "● {count} Düğüm Ekli",
+        "health_paired_nodes": "● {count} Düğüm Ekli",
+        "health_nodes_connected": "● {connected}/{total} Cihaz Bağlı",
+        "health_nodes_waiting": "● {total} Ekli (Bağlantı Bekleniyor)",
+        "health_nodes_none": "● Eşleşen Cihaz Yok",
 
         # Hata Diyaloğu
         "error_dialog_title": "Kurulum Hatası",
         "error_dialog_desc": "Kurulum sırasında bir hata oluştu ve yapılan işlemler geri alındı.",
-        "error_dialog_open_log": "📄 Log Dosyasını Aç",
+        "error_dialog_open_log": "Log Dosyasını Aç",
 
         # Yedek Ekle Diyaloğu
         "node_dialog_title": "Yedek Bilgisayar (Node) Ekle",
-        "node_dialog_desc": "Yedek bilgisayarda kurulum tamamlandıktan sonra ekranda çıkan Cihaz ID'sini aşağıya yapıştırın.",
+        "node_dialog_desc": (
+            "Yedek bilgisayarda kurulum tamamlandığında ekranda gösterilen Syncthing Cihaz ID'sini "
+            "aşağıdaki alana yapıştırıp 'Ekle ve Eşleştir' butonuna tıklayın."
+        ),
         "node_dialog_local_id_title": "Ana Bilgisayar (Sizin) Cihaz ID'niz:",
-        "node_dialog_input_title": "Yedek Bilgisayar ID:",
+        "node_dialog_input_title": "Eklenecek Yedek Bilgisayarın Cihaz ID'si:",
         "node_dialog_btn_add": "Ekle ve Eşleştir",
         "node_dialog_adding": "Ekleniyor...",
         "node_dialog_success": "Yedek bilgisayar başarıyla eklendi ve klasör paylaşıldı!",
@@ -135,19 +185,26 @@ _TRANSLATIONS = {
         "msg_invalid_input": "Geçersiz Giriş",
         "msg_pairing": "Eşleştiriliyor... Lütfen bekleyin.",
         "msg_pairing_ok": "✓ Eşleştirme tamamlandı! Site klasörü yedek düğümle paylaşıldı.",
-        "err_pairing_failed": "❌ Hata: {error}",
-        "err_no_engine": "❌ Kurulum motoru bağlantısı bulunamadı.",
+        "err_pairing_failed": "✕ Hata: {error}",
+        "err_no_engine": "✕ Kurulum motoru bağlantısı bulunamadı.",
 
         # Ayarlar Diyaloğu
         "settings_title": "Sistem Ayarları",
+        "settings_header": "Sistem Ayarları",
         "settings_desc": "Değişiklikler kaydedildiğinde ilgili servisler (Caddy, Cloudflared, Syncthing) otomatik olarak güncellenir.",
         "settings_applying": "Uygulanıyor, lütfen bekleyin...",
         "settings_saved_title": "Başarılı",
         "settings_saved_msg": "Ayarlar kaydedildi ve servisler güncellendi.",
         "settings_save_failed": "Kayıt başarısız.",
+        "settings_error_title": "Hata",
         "settings_err_save": "Ayarlar uygulanırken bir hata oluştu:\n{error}",
+        "settings_error_msg": "Ayarlar uygulanırken bir hata oluştu:\n{error}",
         "uninstall_confirm_title": "Kurulumu Kaldır",
-        "uninstall_confirm_msg": "Tüm AHWS servisleri (Caddy, Cloudflared, Syncthing) durdurulup kaldırılacak. Web sitesi dosyalarınız silinmez.\n\nDevam etmek istiyor musunuz?",
+        "uninstall_confirm_msg": (
+            "Tüm AHWS servisleri (Caddy, Cloudflared, Syncthing) durdurulup kaldırılacak. "
+            "Web sitesi dosyalarınız silinmez.\n\nDevam etmek istiyor musunuz?"
+        ),
+        "uninstall_success_title": "Kaldırıldı",
         "uninstall_success_msg": "Tüm servisler ve yapılandırma başarıyla kaldırıldı.",
 
         # Installer Engine Mesajları
@@ -165,64 +222,81 @@ _TRANSLATIONS = {
         "step_cf": "Cloudflared indiriliyor ve kuruluyor...",
         "step_sync": "Syncthing indiriliyor ve kuruluyor...",
         "step_device_id": "Syncthing Device ID alınıyor...",
-        "step_nssm": "NSSM hazırlanıyor...",
+        "step_nssm": "NSSM servis yöneticisi hazırlanıyor...",
         "step_primary": "Merkez düğüm hazırlanıyor...",
         "step_secondary": "Yedek düğüm hazırlanıyor...",
         "step_auto_accept": "Merkez cihazı eklendi ve klasör eşleştirildi...",
-        "step_rollback": "Kurulum hatası, geri alma başlatılıyor...",
+        "step_rollback": "Kurulum hatası, yapılan işlemler geri alınıyor...",
     },
     "en": {
         # General Buttons
         "btn_next": "Next ▶",
         "btn_back": "◀ Back",
-        "btn_copy": "📋 Copy",
-        "btn_browse": "📂 Browse...",
+        "btn_copy": "Copy",
+        "btn_copy_join_key": "Copy Join Key",
+        "btn_browse": "Browse...",
         "btn_cancel": "Cancel",
         "btn_close": "Close",
-        "btn_save": "💾 Save",
-        "btn_settings": "⚙️ Settings",
-        "btn_refresh": "🔄 Refresh Status",
-        "btn_uninstall": "🗑️ Uninstall Services",
-        "btn_add_node": "➕ Add Backup Node",
-        "btn_start_install": "Start Installation",
-        "btn_retry": "🔄 Retry",
-        "btn_go_to_manage": "🚀 Manage Setup & Add Node",
-        "btn_reinstall": "⚙️ Reinstall / Fresh Setup",
-        "btn_open_site": "🌐 Open Site (http://localhost)",
-        "btn_open_site_browser": "🌐 Open Website in Browser",
+        "btn_home": "◀ Home",
+        "btn_save": "Save",
+        "btn_settings": "Settings",
+        "btn_refresh": "↻ Refresh Status",
+        "btn_refresh_status": "↻ Refresh Status",
+        "btn_uninstall": "Uninstall Services",
+        "btn_add_node": "+ Add Secondary Node",
+        "btn_start_install": "Start Installation ▶",
+        "btn_retry": "↻ Retry",
+        "btn_go_to_manage": "Status Panel & Add Node",
+        "btn_go_to_status": "Live Status Panel",
+        "btn_reinstall": "Reinstall / Fresh Setup",
+        "btn_open_site": "Open Site in Browser",
+        "btn_open_site_browser": "Open Website in Browser",
+        "btn_open_logs": "Open Log File",
 
-        # Welcome
+        # Welcome Page
         "welcome_title": "AHWS Setup",
         "welcome_subtitle": "High Availability (HA) Static Web Setup Wizard",
         "welcome_desc": (
-            "This wizard will automatically install and configure Caddy Web Server, Cloudflare Tunnel, and Syncthing services on your computer.\n\n"
-            "Please ensure you have all required information (Cloudflare Token, etc.) ready before proceeding."
+            "This wizard will automatically install and configure Caddy Web Server, Cloudflare Tunnel, "
+            "and Syncthing services on your computer.\n\n"
+            "Please ensure you have all required information (Cloudflare Tunnel Token, etc.) ready before proceeding."
         ),
         "welcome_existing_title": "✓ Existing Installation Detected",
-        "welcome_existing_desc": "An existing AHWS installation was detected on this machine. You can jump directly to management & node pairing without reinstalling.",
+        "welcome_existing_desc": (
+            "An existing AHWS installation was detected on this computer. You can jump directly to the live "
+            "status panel or manage your settings without reinstalling."
+        ),
         "finish_role": "Node Role",
         "install_date_label": "Installation Date",
         "device_id_short_label": "Device ID",
+        "welcome_device_id_label": "Device ID",
         "unknown_label": "Unknown",
+        "welcome_unknown_date": "Unknown",
         "welcome_warning": "⚠ This process requires administrative privileges. Please accept the UAC prompt to continue.",
 
-        # Server Settings
+        # Server Settings Page
         "server_title": "Server Settings",
         "server_subtitle": "Enter your website folder path and Cloudflare Tunnel token.",
         "server_folder_title": "Website Folder",
         "server_folder_desc": "The folder containing your static site files (must include index.html for Primary).",
-        "server_folder_secondary_desc": "On Secondary nodes, website files will automatically synchronize from the Primary into this folder (index.html not required beforehand).",
+        "server_folder_secondary_desc": (
+            "On Secondary nodes, website files will automatically synchronize from the Primary into this folder "
+            "(index.html is not required beforehand)."
+        ),
         "server_token_title": "Cloudflare Tunnel Token",
         "server_token_desc": "Enter the tunnel token created via Cloudflare Zero Trust.",
         "server_domain_title": "Public Website Domain (Optional)",
-        "server_domain_desc": "If you enter your Cloudflare domain, the site will open directly via the internet after installation. (e.g. https://example.com)",
-        "server_port_title": "Local Caddy Port",
-        "server_port_desc": "The local port Caddy will listen on. (Default: 80)",
-        "server_prevent_sleep": "⚡ Prevent computer from sleeping when plugged in (Recommended for 24/7 HA)",
+        "server_domain_desc": (
+            "If you enter your Cloudflare domain, the site will open directly via this URL after installation "
+            "(e.g. https://example.com)."
+        ),
+        "server_port_title": "Local Caddy Port & Power Settings",
+        "server_port_desc": "The local port Caddy will listen on (Default: 80).",
+        "server_prevent_sleep": "Prevent computer from sleeping when plugged into AC power (Recommended for 24/7 HA)",
         "server_port_ok": "✓ Port available",
-        "server_port_caddy_reinstall": "✓ Port available (Existing Caddy service will be reinstalled)",
-        "server_port_in_use": "⚠ Port in use!",
-        "server_port_invalid": "Invalid port",
+        "server_port_caddy_reinstall": "✓ Port available (Existing Caddy service will be updated)",
+        "server_port_in_use": "⚠ Port is in use by another application!",
+        "server_port_invalid": "Invalid port number",
 
         # Server Settings Errors
         "err_no_folder": "Please select a website folder.",
@@ -233,66 +307,96 @@ _TRANSLATIONS = {
         "err_port_range": "Port value must be between 1 and 65535.",
         "err_port_in_use_msg": "Port {port} is already in use. Please select a different port.",
 
-        # Sync Settings
+        # Sync Settings Page
         "sync_title": "Synchronization (Network) Settings",
-        "sync_subtitle": "Select the role of this computer in the network.",
+        "sync_subtitle": "Select the role of this computer in the High Availability (HA) network.",
         "sync_role_title": "Computer Role",
-        "sync_role_desc": "Will this be the primary server or the backup node?",
+        "sync_role_desc": "Will this be the primary server or a secondary backup node?",
         "sync_role_primary": "1- Primary Computer (Center)",
         "sync_role_secondary": "2- Secondary Computer (Node)",
-        "sync_primary_desc": "Select Primary if this is the first computer you are setting up.",
+        "sync_primary_desc": "Select Primary if this is the first computer you are setting up and holds your site files.",
         "sync_secondary_desc": "Select Secondary if this computer will synchronize with Primary and act as a failover node.",
-        "sync_join_key_title": "🔑 Quick Setup: Cluster Join Key (Optional)",
-        "sync_join_key_desc": "Paste the 'AHWS1-...' key generated on the Primary computer to auto-fill Device ID, Cloudflare Token, Port, and Domain!",
+        "sync_join_key_title": "Quick Setup: Cluster Join Key (Optional)",
+        "sync_join_key_desc": (
+            "Paste the 'AHWS1-...' key generated on the Primary computer to auto-fill Primary Device ID, "
+            "Cloudflare Token, Port, and Domain!"
+        ),
         "sync_join_key_applied": "✓ Cluster Join Key decoded! All server settings have been auto-filled.",
         "sync_join_key_invalid": "⚠ Invalid Cluster Join Key format.",
+        "err_invalid_join_key": "⚠ Invalid Cluster Join Key format.",
         "sync_device_title": "Primary Computer ID (Syncthing Device ID)",
         "sync_device_desc": "Paste the Device ID shown on the Primary computer's completion screen here.",
 
         # Sync Errors
-        "err_no_device_id": "Please enter the Primary Computer's Syncthing ID or Cluster Join Key.",
+        "err_no_device_id": "Please enter the Primary Computer's Syncthing Device ID or Cluster Join Key.",
         "err_invalid_device_id": "Invalid Device ID format. Correct format: AAAAAAA-BBBBBBB-...",
 
         # Install Page
         "install_title": "Installing",
-        "install_subtitle": "Please wait, services are being downloaded and installed in the background...",
+        "install_subtitle": "Please wait, services are being downloaded and configured in the background...",
         "install_preparing": "Preparing installation...",
+        "install_log_title": "Installation Log",
         "install_cancelling": "Cancelling installation...",
-        "install_failed_status": "❌ Installation failed!",
+        "install_cancelling_log": "⚠ Cancelling installation and rolling back changes...",
+        "install_failed": "✕ Installation failed!",
+        "install_failed_status": "✕ Installation failed!",
+        "install_error_prefix": "✕ ERROR: {message}",
+        "install_complete": "✓ Installation complete!",
         "install_complete_status": "✓ Installation complete!",
+        "install_complete_log": "✓ Installation completed successfully!",
+        "install_cancelled": "⚠ Installation cancelled.",
+        "install_cancelled_log": "⚠ Installation was cancelled by the user.",
 
-        # Finish Page
-        "finish_title": "Installation Complete! 🎉",
-        "finish_subtitle": "The system has been successfully set up and is running in the background.",
-        "finish_success_msg": "Services (Caddy, Cloudflared, Syncthing) are active.",
+        # Finish & Status Panel Page
+        "finish_title": "Installation Complete!",
+        "finish_subtitle": "The system has been successfully set up and is running as background services.",
+        "finish_success_msg": "Services (Caddy, Cloudflared, Syncthing) are configured as Windows services.",
         "finish_loading": "(loading...)",
-        "finish_device_id_title": "Your Syncthing Device ID:",
-        "finish_device_id_desc": "This ID is required for other devices on the network to connect to you.",
-        "finish_join_key_title": "🔑 Cluster Join Key (One-Key Setup for Secondary Node):",
-        "finish_join_key_desc": "Paste this key when setting up a Secondary node to transfer Token + Device ID + Port settings in one click.",
-        "finish_primary_hint": "Use this ID or the Cluster Join Key when setting up the Secondary computer (Node). Then use 'Add Backup Node' below to pair them.",
-        "finish_secondary_hint": "The secondary computer is successfully connected to the primary. Your files will synchronize automatically.",
-        "finish_open_site_desc": "Your site is live on Caddy Web Server! It is active on your computer even without adding a secondary node.",
+        "finish_device_id_title": "This Computer's Syncthing Device ID:",
+        "finish_device_id_desc": "After installing on a Secondary computer, add its Device ID here:",
+        "finish_join_key_title": "Cluster Join Key (AHWS1)",
+        "finish_join_key_desc": "Copy this key for one-paste setup on Secondary nodes (includes Token + ID + Port).",
+        "finish_primary_hint": (
+            "Step 1: Use the 'Cluster Join Key' below (or your Device ID) when installing on the Secondary computer.\n"
+            "Step 2: Once the Secondary computer finishes setup, copy its Device ID and add it here via '+ Add Secondary Node'."
+        ),
+        "finish_secondary_hint": (
+            "IMPORTANT FINAL STEP: This computer is set up as a Secondary Node. To start file synchronization, "
+            "copy your Device ID above and add it on the PRIMARY computer using the '+ Add Secondary Node' button!"
+        ),
+        "finish_open_site_desc": "Your website is live on Caddy Web Server! Use the buttons below to open your site or adjust settings.",
         "msg_copied_title": "Copied",
         "msg_copied_device_id": "Device ID copied to clipboard.",
         "msg_copied_join_key": "Cluster Join Key copied to clipboard.",
 
         # Live Health Dashboard
-        "health_title": "Live System Status",
-        "health_running": "🟢 Running",
-        "health_stopped": "🔴 Stopped",
-        "health_nodes": "Paired Nodes: {count}",
+        "health_title": "Live System & Service Status",
+        "health_card_title": "Live System & Service Status",
+        "health_col_caddy": "Caddy (Web Server)",
+        "health_col_cloudflared": "Cloudflared (Tunnel)",
+        "health_col_syncthing": "Syncthing (Sync)",
+        "health_col_nodes": "Sync Cluster",
+        "health_running": "● Running",
+        "health_stopped": "● Stopped",
+        "health_nodes": "● {count} Nodes Added",
+        "health_paired_nodes": "● {count} Nodes Added",
+        "health_nodes_connected": "● {connected}/{total} Connected",
+        "health_nodes_waiting": "● {total} Added (Waiting)",
+        "health_nodes_none": "● No Paired Nodes",
 
         # Error Dialog
         "error_dialog_title": "Installation Error",
         "error_dialog_desc": "An error occurred during installation and changes have been rolled back.",
-        "error_dialog_open_log": "📄 Open Log File",
+        "error_dialog_open_log": "Open Log File",
 
         # Node Dialog
         "node_dialog_title": "Add Secondary Computer (Node)",
-        "node_dialog_desc": "Paste the Device ID displayed on the secondary computer after its installation is complete.",
+        "node_dialog_desc": (
+            "Paste the Syncthing Device ID displayed on the Secondary computer after its installation is complete, "
+            "then click 'Add and Pair'."
+        ),
         "node_dialog_local_id_title": "Primary Computer (Your) Device ID:",
-        "node_dialog_input_title": "Secondary Computer ID:",
+        "node_dialog_input_title": "Secondary Computer's Device ID to Add:",
         "node_dialog_btn_add": "Add and Pair",
         "node_dialog_adding": "Adding...",
         "node_dialog_success": "Secondary computer successfully added and folder shared!",
@@ -300,19 +404,26 @@ _TRANSLATIONS = {
         "msg_invalid_input": "Invalid Input",
         "msg_pairing": "Pairing... Please wait.",
         "msg_pairing_ok": "✓ Pairing complete! Site folder shared with the secondary node.",
-        "err_pairing_failed": "❌ Error: {error}",
-        "err_no_engine": "❌ Installer engine connection not found.",
+        "err_pairing_failed": "✕ Error: {error}",
+        "err_no_engine": "✕ Installer engine connection not found.",
 
         # Settings Dialog
         "settings_title": "System Settings",
+        "settings_header": "System Settings",
         "settings_desc": "When changes are saved, related services (Caddy, Cloudflared, Syncthing) will be updated automatically.",
         "settings_applying": "Applying changes, please wait...",
         "settings_saved_title": "Success",
         "settings_saved_msg": "Settings saved and services updated.",
         "settings_save_failed": "Save failed.",
+        "settings_error_title": "Error",
         "settings_err_save": "An error occurred while applying settings:\n{error}",
+        "settings_error_msg": "An error occurred while applying settings:\n{error}",
         "uninstall_confirm_title": "Uninstall Services",
-        "uninstall_confirm_msg": "All AHWS services (Caddy, Cloudflared, Syncthing) will be stopped and removed. Your website files will not be deleted.\n\nDo you want to continue?",
+        "uninstall_confirm_msg": (
+            "All AHWS services (Caddy, Cloudflared, Syncthing) will be stopped and removed. "
+            "Your website files will not be deleted.\n\nDo you want to continue?"
+        ),
+        "uninstall_success_title": "Uninstalled",
         "uninstall_success_msg": "All services and configuration have been removed.",
 
         # Installer Engine Messages
@@ -330,13 +441,15 @@ _TRANSLATIONS = {
         "step_cf": "Downloading and installing Cloudflared...",
         "step_sync": "Downloading and installing Syncthing...",
         "step_device_id": "Getting Syncthing Device ID...",
-        "step_nssm": "Preparing NSSM...",
+        "step_nssm": "Preparing NSSM service manager...",
         "step_primary": "Preparing primary node...",
         "step_secondary": "Preparing secondary node...",
         "step_auto_accept": "Primary device added and folder paired...",
-        "step_rollback": "Installation error, rolling back...",
-    }
+        "step_rollback": "Installation error, rolling back changes...",
+    },
 }
+
+TRANSLATIONS = _TRANSLATIONS
 
 
 def set_language(lang_code: str):

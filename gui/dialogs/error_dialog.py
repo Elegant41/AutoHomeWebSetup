@@ -24,6 +24,15 @@ class ErrorDialog(tk.Toplevel):
         self.resizable(False, False)
         self.configure(bg=theme.BG_COLOR)
         self.transient(parent)
+
+        try:
+            from utils.resource_path import resource_path
+            icon_path = resource_path("assets/icon.ico")
+            if icon_path.exists():
+                self.iconbitmap(str(icon_path))
+        except Exception:
+            pass
+
         try:
             self.grab_set()
         except Exception:
@@ -42,8 +51,8 @@ class ErrorDialog(tk.Toplevel):
         # Hata ikonu
         icon_label = StyledLabel(
             content,
-            text="❌",
-            font=("Segoe UI", 36),
+            text="✕",
+            font=("Segoe UI", 36, "bold"),
             fg=theme.ERROR_COLOR,
             bg=theme.BG_COLOR,
         )

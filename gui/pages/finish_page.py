@@ -1,29 +1,31 @@
 """
-Bitiş sayfası.
+Bitiş ve Canlı Durum Paneli sayfası.
 
-Başarı mesajı, Device ID gösterimi + kopyala butonu ve
-"Yedek Ekle" butonu (Merkez ise) içerir.
+Başarı mesajı, Cihaz ID / Küme Katılım Kodu gösterimi,
+4 kutulu canlı servis sağlık paneli (Caddy, Cloudflared, Syncthing, Eşleşen Cihaz)
+ve Merkez düğüm için "+ Yedek Bilgisayar Ekle" yönetimi içerir.
 """
 
+import threading
 import tkinter as tk
 
 from gui import theme
 from gui.base_page import BasePage
+from gui.dialogs.node_manager_dialog import NodeManagerDialog
 from gui.widgets import (
     CardFrame,
     PrimaryButton,
     SecondaryButton,
     StyledLabel,
 )
-from gui.dialogs.node_manager_dialog import NodeManagerDialog
-from utils.logger import get_logger
 from utils.i18n import t
+from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 
 class FinishPage(BasePage):
-    """5. Adım: Bitiş + Device ID + Canlı Durum Paneli."""
+    """5. Adım: Bitiş + Cihaz ID + Canlı Durum Paneli."""
 
     PAGE_NAME = "finish"
 
@@ -33,14 +35,16 @@ class FinishPage(BasePage):
         self.local_device_id = ""
         self.join_key = ""
         self.node_role = "primary"
+        self._auto_refresh_job = None
+        self._is_active = False
 
         # ─── İçerik ─────────────────────────────────────────────────
         content = tk.Frame(self, bg=theme.BG_COLOR)
-        content.pack(fill=tk.BOTH, expand=True, padx=theme.PADDING_LARGE, pady=theme.PADDING_MEDIUM)
+        content.pack(fill=tk.BOTH, expand=True, padx=theme.PADDING_LARGE, pady=theme.PADDING_SMALL)
 
-        # ─── Başarı Mesajı ──────────────────────────────────────────
+        # ─── Başarı Başlığı ─────────────────────────────────────────
         success_frame = tk.Frame(content, bg=theme.BG_COLOR)
-        success_frame.pack(fill=tk.X, pady=(4, 8))
+        success_frame.pack(fill=tk.X, pady=(2, 6))
 
         title_row = tk.Frame(success_frame, bg=theme.BG_COLOR)
         title_row.pack()
@@ -48,7 +52,7 @@ class FinishPage(BasePage):
         success_icon = StyledLabel(
             title_row,
             text="✓ ",
-            font=("Segoe UI", 22, "bold"),
+            font=("Segoe UI", 20, "bold"),
             fg=theme.SUCCESS_COLOR,
             bg=theme.BG_COLOR,
         )
@@ -69,13 +73,13 @@ class FinishPage(BasePage):
             font=theme.FONT_SMALL,
             fg=theme.FG_SECONDARY,
             bg=theme.BG_COLOR,
-            wraplength=600,
+            wraplength=650,
             justify=tk.CENTER,
         )
-        success_subtitle.pack(pady=(2, 4))
+        success_subtitle.pack(pady=(2, 2))
 
-        # ─── Device ID & Join Key Kartı ─────────────────────────────
-        self.device_id_card = CardFrame(content)
+        # ─── 1. Cihaz ID & Küme Katılım Kodu Kartı ──────────────────
+        self.device_id_card = CardFrame(content, pady=12)
         self.device_id_card.pack(fill=tk.X, pady=(0, theme.PADDING_SMALL))
 
         device_id_title = StyledLabel(
@@ -85,68 +89,80 @@ class FinishPage(BasePage):
             fg=theme.FG_COLOR,
             bg=theme.BG_SECONDARY,
         )
-        device_id_title.pack(anchor=tk.W, pady=(0, 2))
+        device_id_title.pack(anchor=tk.W, pady=(0, 4))
 
         device_id_row = tk.Frame(self.device_id_card, bg=theme.BG_SECONDARY)
         device_id_row.pack(fill=tk.X)
 
-        self.device_id_label = StyledLabel(
-            device_id_row,
-            text=t("finish_loading"),
-            font=theme.FONT_MONO_SMALL,
-            fg=theme.ACCENT_COLOR,
-            bg=theme.BG_SECONDARY,
-        )
-        self.device_id_label.pack(side=tk.LEFT, padx=(0, theme.PADDING_SMALL))
-
+        # ÖNCE sağdaki butonu pack et ki uzun ID metni butonu sıkıştırmasın
         copy_btn = SecondaryButton(
             device_id_row,
             text=t("btn_copy"),
             command=self._copy_device_id,
             width=12,
         )
-        copy_btn.pack(side=tk.RIGHT)
+        copy_btn.pack(side=tk.RIGHT, padx=(theme.PADDING_SMALL, 0))
+
+        self.device_id_label = StyledLabel(
+            device_id_row,
+            text=t("finish_loading"),
+            font=theme.FONT_MONO_SMALL,
+            fg=theme.ACCENT_COLOR,
+            bg=theme.BG_TERTIARY,
+            padx=8,
+            pady=6,
+            anchor=tk.W,
+        )
+        self.device_id_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
         self.device_id_hint = StyledLabel(
             self.device_id_card,
             text=t("finish_primary_hint"),
             font=theme.FONT_SMALL,
-            fg=theme.FG_DISABLED,
-            bg=theme.BG_SECONDARY,
-            wraplength=600,
-            justify=tk.LEFT,
-        )
-        self.device_id_hint.pack(anchor=tk.W, pady=(2, 0))
-
-        # Küme Katılım Anahtarı satırı (Merkez düğümde görünür)
-        self.join_key_frame = tk.Frame(self.device_id_card, bg=theme.BG_SECONDARY)
-        self.join_key_frame.pack(fill=tk.X, pady=(6, 0))
-
-        join_key_lbl = StyledLabel(
-            self.join_key_frame,
-            text=f"{t('finish_join_key_title')}: {t('finish_join_key_desc')}",
-            font=theme.FONT_SMALL,
             fg=theme.FG_SECONDARY,
             bg=theme.BG_SECONDARY,
-            wraplength=480,
+            wraplength=680,
             justify=tk.LEFT,
         )
-        join_key_lbl.pack(side=tk.LEFT)
+        self.device_id_hint.pack(anchor=tk.W, pady=(6, 0))
+
+        # Küme Katılım Anahtarı satırı (Sadece Merkez düğümde gösterilir)
+        self.join_key_frame = tk.Frame(self.device_id_card, bg=theme.BG_SECONDARY)
 
         copy_join_btn = SecondaryButton(
             self.join_key_frame,
-            text=t("btn_copy"),
+            text=t("btn_copy_join_key"),
             command=self._copy_join_key,
-            width=12,
+            width=20,
         )
-        copy_join_btn.pack(side=tk.RIGHT)
+        copy_join_btn.pack(side=tk.RIGHT, padx=(theme.PADDING_SMALL, 0))
 
-        # ─── Canlı Sistem ve Servis Durumu Kartı ────────────────────
-        self.health_card = CardFrame(content)
+        join_key_lbl = StyledLabel(
+            self.join_key_frame,
+            text=f"• {t('finish_join_key_title')}: {t('finish_join_key_desc')}",
+            font=theme.FONT_SMALL,
+            fg=theme.ACCENT_COLOR,
+            bg=theme.BG_SECONDARY,
+            wraplength=480,
+            justify=tk.LEFT,
+            anchor=tk.W,
+        )
+        join_key_lbl.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        # ─── 2. Canlı Sistem ve Servis Durumu Kartı (4 Kutulu Grid) ─
+        self.health_card = CardFrame(content, pady=12)
         self.health_card.pack(fill=tk.X, pady=(0, theme.PADDING_SMALL))
 
         health_header = tk.Frame(self.health_card, bg=theme.BG_SECONDARY)
-        health_header.pack(fill=tk.X, pady=(0, 4))
+        health_header.pack(fill=tk.X, pady=(0, 8))
+
+        refresh_btn = SecondaryButton(
+            health_header,
+            text=t("btn_refresh_status"),
+            command=self.refresh_health_status,
+            width=16,
+        )
+        refresh_btn.pack(side=tk.RIGHT)
 
         health_title = StyledLabel(
             health_header,
@@ -157,26 +173,22 @@ class FinishPage(BasePage):
         )
         health_title.pack(side=tk.LEFT)
 
-        refresh_btn = SecondaryButton(
-            health_header,
-            text=t("btn_refresh_status"),
-            command=self.refresh_health_status,
-            width=16,
-        )
-        refresh_btn.pack(side=tk.RIGHT)
+        # 4'lü Durum Kutuları
+        self.health_grid = tk.Frame(self.health_card, bg=theme.BG_SECONDARY)
+        self.health_grid.pack(fill=tk.X)
+        for col in range(4):
+            self.health_grid.grid_columnconfigure(col, weight=1, uniform="health_col")
 
-        self.health_status_label = StyledLabel(
-            self.health_card,
-            text=t("finish_loading"),
-            font=theme.FONT_SMALL,
-            fg=theme.FG_SECONDARY,
-            bg=theme.BG_SECONDARY,
-            justify=tk.LEFT,
-        )
-        self.health_status_label.pack(anchor=tk.W)
+        self.caddy_status_lbl = self._create_health_box(0, t("health_col_caddy"))
+        self.cf_status_lbl = self._create_health_box(1, t("health_col_cloudflared"))
+        self.st_status_lbl = self._create_health_box(2, t("health_col_syncthing"))
+        self.nodes_status_lbl = self._create_health_box(3, t("health_col_nodes"))
 
-        # ─── Siteyi Aç ve Ayarlar Kartı ─────────────────────────────
-        open_site_card = CardFrame(content)
+        # Legacy uyumluluk için gizli etiket referansı
+        self.health_status_label = self.nodes_status_lbl
+
+        # ─── 3. Siteyi Aç ve Ayarlar Kartı ──────────────────────────
+        open_site_card = CardFrame(content, pady=12)
         open_site_card.pack(fill=tk.X, pady=(0, theme.PADDING_SMALL))
 
         open_site_desc = StyledLabel(
@@ -185,10 +197,10 @@ class FinishPage(BasePage):
             font=theme.FONT_SMALL,
             fg=theme.FG_SECONDARY,
             bg=theme.BG_SECONDARY,
-            wraplength=600,
+            wraplength=680,
             justify=tk.LEFT,
         )
-        open_site_desc.pack(anchor=tk.W, pady=(0, theme.PADDING_XS))
+        open_site_desc.pack(anchor=tk.W, pady=(0, 6))
 
         site_btn_row = tk.Frame(open_site_card, bg=theme.BG_SECONDARY)
         site_btn_row.pack(fill=tk.X)
@@ -205,39 +217,47 @@ class FinishPage(BasePage):
             site_btn_row,
             text=t("btn_settings"),
             command=self._open_settings,
-            width=18,
+            width=16,
         )
         settings_btn.pack(side=tk.LEFT)
 
-        # ─── Yedek Ekle Kartı (sadece Merkez için) ───────────────────
-        self.node_manager_card = CardFrame(content)
-        # Başlangıçta gizli
+        # ─── 4. Yedek Ekle Kartı (Sadece Merkez düğüm için) ─────────
+        self.node_manager_card = CardFrame(content, pady=12)
 
         node_row = tk.Frame(self.node_manager_card, bg=theme.BG_SECONDARY)
         node_row.pack(fill=tk.X)
+
+        add_node_btn = PrimaryButton(
+            node_row,
+            text=t("btn_add_node"),
+            command=self._open_node_manager,
+            width=22,
+        )
+        add_node_btn.pack(side=tk.RIGHT, padx=(theme.PADDING_SMALL, 0))
 
         node_manager_desc = StyledLabel(
             node_row,
             text=t("finish_device_id_desc"),
             font=theme.FONT_SMALL,
-            fg=theme.FG_SECONDARY,
+            fg=theme.FG_COLOR,
             bg=theme.BG_SECONDARY,
             wraplength=460,
             justify=tk.LEFT,
+            anchor=tk.W,
         )
-        node_manager_desc.pack(side=tk.LEFT)
+        node_manager_desc.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
-        add_node_btn = SecondaryButton(
-            node_row,
-            text=t("btn_add_node"),
-            command=self._open_node_manager,
-            width=16,
-        )
-        add_node_btn.pack(side=tk.RIGHT)
-
-        # ─── Kapat Butonu ───────────────────────────────────────────
+        # ─── Alt Butonlar (Ana Ekran & Kapat) ───────────────────────
         footer = tk.Frame(content, bg=theme.BG_COLOR)
-        footer.pack(fill=tk.X, side=tk.BOTTOM, pady=theme.PADDING_SMALL)
+        footer.pack(fill=tk.X, side=tk.BOTTOM, pady=(theme.PADDING_XS, 4))
+
+        home_btn = SecondaryButton(
+            footer,
+            text=t("btn_home"),
+            command=self._go_home,
+            width=14,
+        )
+        home_btn.pack(side=tk.LEFT)
 
         close_btn = PrimaryButton(
             footer,
@@ -245,7 +265,34 @@ class FinishPage(BasePage):
             command=self._close_window,
             width=14,
         )
-        close_btn.pack()
+        close_btn.pack(side=tk.RIGHT)
+
+    def _create_health_box(self, col: int, title_text: str) -> StyledLabel:
+        """Sağlık panelinde tek bir servis kutusu oluşturur ve durum etiketini döndürür."""
+        pad_left = 0 if col == 0 else 4
+        pad_right = 0 if col == 3 else 4
+
+        box = tk.Frame(self.health_grid, bg=theme.BG_TERTIARY, padx=10, pady=8)
+        box.grid(row=0, column=col, sticky="nsew", padx=(pad_left, pad_right))
+
+        title_lbl = StyledLabel(
+            box,
+            text=title_text,
+            font=theme.FONT_SMALL,
+            fg=theme.FG_SECONDARY,
+            bg=theme.BG_TERTIARY,
+        )
+        title_lbl.pack(anchor=tk.W)
+
+        status_lbl = StyledLabel(
+            box,
+            text=t("finish_loading"),
+            font=("Segoe UI", 10, "bold"),
+            fg=theme.FG_SECONDARY,
+            bg=theme.BG_TERTIARY,
+        )
+        status_lbl.pack(anchor=tk.W, pady=(3, 0))
+        return status_lbl
 
     def _open_website(self) -> None:
         """Yerel web sitesini veya ayarlanmışsa internet sitesini varsayılan tarayıcıda açar."""
@@ -287,8 +334,15 @@ class FinishPage(BasePage):
             self._display_info(t("msg_copied_title"), t("msg_copied_join_key"))
 
     def _open_node_manager(self) -> None:
-        """Node manager diyaloğunu açar."""
+        """Node manager diyaloğunu açar (Sadece Merkez düğümde)."""
+        if self.node_role == "secondary":
+            return
         NodeManagerDialog(self, self.controller)
+
+    def _go_home(self) -> None:
+        """Hoşgeldiniz ekranına döner."""
+        if self.controller:
+            self.controller.go_to_page("welcome")
 
     def _close_window(self) -> None:
         """Uygulamayı kapatır."""
@@ -301,42 +355,94 @@ class FinishPage(BasePage):
             self.device_id_label.config(text=device_id)
 
     def set_node_role(self, role: str) -> None:
-        """Node rolünü ayarlar. 'secondary' ise Yedek Ekle kartını gizler."""
+        """Node rolünü ayarlar. 'secondary' ise Yedek Ekle kartını ve Join Key'i gizler."""
         self.node_role = role
         if role == "secondary":
             self.node_manager_card.pack_forget()
             self.join_key_frame.pack_forget()
-            self.device_id_hint.config(text=t("finish_secondary_hint"))
+            self.device_id_hint.config(
+                text=t("finish_secondary_hint"),
+                fg=theme.WARNING_COLOR,
+            )
         else:
             self.node_manager_card.pack(fill=tk.X, pady=(0, theme.PADDING_SMALL))
             if self.join_key:
-                self.join_key_frame.pack(fill=tk.X, pady=(6, 0))
-            self.device_id_hint.config(text=t("finish_primary_hint"))
+                self.join_key_frame.pack(fill=tk.X, pady=(8, 0))
+            else:
+                self.join_key_frame.pack_forget()
+            self.device_id_hint.config(
+                text=t("finish_primary_hint"),
+                fg=theme.FG_SECONDARY,
+            )
 
     def refresh_health_status(self) -> None:
-        """Servislerin canlı çalışma durumunu sorgular ve etiketi günceller."""
+        """Servislerin canlı çalışma durumunu arka planda sorgular ve kutuları günceller."""
         if not self.controller or not hasattr(self.controller, "installer_engine"):
             return
-        try:
-            health = self.controller.installer_engine.get_system_health()
-            caddy_txt = t("health_running") if health.get("caddy_running") else t("health_stopped")
-            cf_txt = t("health_running") if health.get("cloudflared_running") else t("health_stopped")
-            st_txt = t("health_running") if health.get("syncthing_running") else t("health_stopped")
-            peers = health.get("paired_devices", 0)
 
-            summary = (
-                f"Caddy: {caddy_txt}   |   "
-                f"Cloudflared: {cf_txt}   |   "
-                f"Syncthing: {st_txt}   |   "
-                f"{t('health_paired_nodes', count=peers)}"
+        def _worker():
+            try:
+                health = self.controller.installer_engine.get_system_health()
+                if self._is_active and self.winfo_exists():
+                    self.after(0, lambda: self._apply_health_ui(health))
+            except Exception as e:
+                logger.debug(f"Sağlık durumu okunamadı: {e}")
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _apply_health_ui(self, health: dict) -> None:
+        """Sorgulanan sağlık verilerini 4 kutulu gösterge paneline uygular."""
+        if not self.winfo_exists():
+            return
+
+        # 1. Caddy
+        if health.get("caddy_running"):
+            self.caddy_status_lbl.config(text=t("health_running"), fg=theme.SUCCESS_COLOR)
+        else:
+            self.caddy_status_lbl.config(text=t("health_stopped"), fg=theme.ERROR_COLOR)
+
+        # 2. Cloudflared
+        if health.get("cloudflared_running"):
+            self.cf_status_lbl.config(text=t("health_running"), fg=theme.SUCCESS_COLOR)
+        else:
+            self.cf_status_lbl.config(text=t("health_stopped"), fg=theme.ERROR_COLOR)
+
+        # 3. Syncthing
+        if health.get("syncthing_running"):
+            self.st_status_lbl.config(text=t("health_running"), fg=theme.SUCCESS_COLOR)
+        else:
+            self.st_status_lbl.config(text=t("health_stopped"), fg=theme.ERROR_COLOR)
+
+        # 4. Eşleşen ve Bağlı Düğümler
+        paired = health.get("paired_devices", 0)
+        connected = health.get("connected_devices", 0)
+        if paired > 0 and connected > 0:
+            self.nodes_status_lbl.config(
+                text=t("health_nodes_connected", connected=connected, total=paired),
+                fg=theme.SUCCESS_COLOR,
             )
-            self.health_status_label.config(text=summary)
-        except Exception as e:
-            logger.debug(f"Sağlık durumu okunamadı: {e}")
+        elif paired > 0:
+            self.nodes_status_lbl.config(
+                text=t("health_nodes_waiting", total=paired),
+                fg=theme.WARNING_COLOR,
+            )
+        else:
+            self.nodes_status_lbl.config(
+                text=t("health_nodes_none"),
+                fg=theme.FG_SECONDARY,
+            )
+
+    def _schedule_periodic_refresh(self) -> None:
+        """Sayfa açıkken her 5 saniyede bir durumu otomatik günceller."""
+        if not self._is_active:
+            return
+        self.refresh_health_status()
+        self._auto_refresh_job = self.after(5000, self._schedule_periodic_refresh)
 
     # ─── BasePage Override'ları ─────────────────────────────────────
     def on_enter(self) -> None:
-        """Sayfaya girildiğinde verileri yükle."""
+        """Sayfaya girildiğinde verileri yükle ve canlı izlemeyi başlat."""
+        self._is_active = True
         if self.controller:
             config = self.controller.build_install_config()
             role = getattr(config, "node_role", "primary")
@@ -350,6 +456,8 @@ class FinishPage(BasePage):
                 saved = ConfigManager().load()
                 if not device_id:
                     device_id = saved.get("local_device_id", "")
+                if saved.get("node_role") and not self.controller.get_saved_page_data("sync_settings"):
+                    role_str = saved["node_role"]
             except Exception as e:
                 logger.warning(f"Kayıtlı konfigürasyondan Device ID okunamadı: {e}")
 
@@ -363,7 +471,7 @@ class FinishPage(BasePage):
             token = getattr(config, "cloudflare_token", "") or saved.get("cloudflare_token", "")
             port = getattr(config, "caddy_port", 80) or saved.get("caddy_port", 80)
             domain = getattr(config, "public_domain", "") or saved.get("public_domain", "")
-            if device_id and token:
+            if device_id and token and role_str == "primary":
                 try:
                     from core.models import InstallConfig
                     self.join_key = InstallConfig.generate_join_key(
@@ -374,7 +482,19 @@ class FinishPage(BasePage):
                     )
                 except Exception:
                     self.join_key = ""
+            else:
+                self.join_key = ""
 
             self.set_device_id(device_id)
             self.set_node_role(role_str)
-            self.refresh_health_status()
+            self._schedule_periodic_refresh()
+
+    def on_leave(self) -> None:
+        """Sayfadan çıkılırken otomatik yenileme zamanlayıcısını durdur."""
+        self._is_active = False
+        if self._auto_refresh_job is not None:
+            try:
+                self.after_cancel(self._auto_refresh_job)
+            except Exception:
+                pass
+            self._auto_refresh_job = None

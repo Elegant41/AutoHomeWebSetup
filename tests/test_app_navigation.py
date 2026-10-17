@@ -122,5 +122,45 @@ class TestPageNavigationLogic(unittest.TestCase):
             )
 
 
+class TestI18nCompleteness(unittest.TestCase):
+    """Projedeki tum t('...') anahtarlarinin tr ve en sozluklerinde eksiksiz oldugunu dogrular."""
+
+    def test_all_i18n_keys_exist_in_tr_and_en(self):
+        import ast
+        from utils.i18n import TRANSLATIONS
+
+        root = Path(__file__).resolve().parent.parent
+        used_keys = set()
+
+        for py_file in root.rglob("*.py"):
+            if "venv" in py_file.parts or "build" in py_file.parts or "dist" in py_file.parts:
+                continue
+            tree = ast.parse(py_file.read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Call):
+                    func = node.func
+                    if isinstance(func, ast.Name) and func.id == "t":
+                        if node.args and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str):
+                            used_keys.add(node.args[0].value)
+
+        self.assertGreater(len(used_keys), 50)
+        missing_tr = used_keys - set(TRANSLATIONS["tr"].keys())
+        missing_en = used_keys - set(TRANSLATIONS["en"].keys())
+        self.assertEqual(missing_tr, set(), f"TR sozlugunde eksik anahtarlar: {missing_tr}")
+        self.assertEqual(missing_en, set(), f"EN sozlugunde eksik anahtarlar: {missing_en}")
+
+    def test_no_astral_emojis_in_translations(self):
+        """Windows 10 Tkinter GDI'da bozuk gorunen U+FFFF ustu emoji bulunmamali."""
+        from utils.i18n import TRANSLATIONS
+
+        for lang, table in TRANSLATIONS.items():
+            for key, val in table.items():
+                astral = [ch for ch in val if ord(ch) > 0xFFFF]
+                self.assertEqual(
+                    astral, [],
+                    f"{lang}.{key} icinde Windows 10 Tkinter'da bozuk gorunen karakter var: {astral}"
+                )
+
+
 if __name__ == "__main__":
     unittest.main()

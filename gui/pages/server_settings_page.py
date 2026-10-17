@@ -76,21 +76,21 @@ class ServerSettingsPage(BasePage):
         folder_row = tk.Frame(folder_card, bg=theme.BG_SECONDARY)
         folder_row.pack(fill=tk.X)
 
-        self.folder_var = tk.StringVar()
-        self.folder_entry = StyledEntry(
-            folder_row,
-            textvariable=self.folder_var,
-            width=50,
-        )
-        self.folder_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, theme.PADDING_SMALL))
-
         browse_btn = SecondaryButton(
             folder_row,
             text=t("btn_browse"),
             command=self._browse_folder,
             width=14,
         )
-        browse_btn.pack(side=tk.RIGHT)
+        browse_btn.pack(side=tk.RIGHT, padx=(theme.PADDING_SMALL, 0))
+
+        self.folder_var = tk.StringVar()
+        self.folder_entry = StyledEntry(
+            folder_row,
+            textvariable=self.folder_var,
+            width=50,
+        )
+        self.folder_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
         # ─── Cloudflare Tunnel Token ─────────────────────────────────
         token_card = CardFrame(content)

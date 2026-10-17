@@ -29,7 +29,7 @@ class WelcomePage(BasePage):
 
         btn_tr = SecondaryButton(
             lang_frame,
-            text="🇹🇷 TR",
+            text="TR",
             command=lambda: self.controller.change_language("tr"),
             width=6,
         )
@@ -37,7 +37,7 @@ class WelcomePage(BasePage):
 
         btn_en = SecondaryButton(
             lang_frame,
-            text="🇬🇧 EN",
+            text="EN",
             command=lambda: self.controller.change_language("en"),
             width=6,
         )
@@ -76,9 +76,9 @@ class WelcomePage(BasePage):
             fg=theme.FG_COLOR,
             bg=theme.BG_SECONDARY,
             justify=tk.LEFT,
-            wraplength=550,
+            wraplength=580,
         )
-        info_label.pack()
+        info_label.pack(anchor=tk.W)
 
         # ─── 2. Mevcut Kurulum Algılandı Kartı ───────────────────────
         self.existing_frame = tk.Frame(self, bg=theme.BG_SECONDARY, padx=30, pady=20)
@@ -99,7 +99,7 @@ class WelcomePage(BasePage):
             fg=theme.FG_COLOR,
             bg=theme.BG_SECONDARY,
             justify=tk.LEFT,
-            wraplength=550,
+            wraplength=580,
         )
         self.existing_info_label.pack(anchor=tk.W, pady=(0, 16))
 
@@ -110,7 +110,7 @@ class WelcomePage(BasePage):
             existing_btn_row1,
             text=t("btn_open_site"),
             command=self._open_website,
-            width=28,
+            width=26,
         )
         self.open_site_btn.pack(side=tk.LEFT, padx=(0, 10))
 
@@ -118,7 +118,7 @@ class WelcomePage(BasePage):
             existing_btn_row1,
             text=t("btn_settings"),
             command=self._open_settings,
-            width=28,
+            width=26,
         )
         self.settings_btn.pack(side=tk.LEFT)
 
@@ -129,7 +129,7 @@ class WelcomePage(BasePage):
             existing_btn_row2,
             text=t("btn_go_to_manage"),
             command=self._go_to_management,
-            width=28,
+            width=26,
         )
         self.manage_btn.pack(side=tk.LEFT, padx=(0, 10))
 
@@ -137,7 +137,7 @@ class WelcomePage(BasePage):
             existing_btn_row2,
             text=t("btn_reinstall"),
             command=self.next_page,
-            width=28,
+            width=26,
         )
         self.reinstall_btn.pack(side=tk.LEFT)
 
@@ -148,7 +148,7 @@ class WelcomePage(BasePage):
             font=theme.FONT_SMALL,
             fg=theme.WARNING_COLOR,
             bg=theme.BG_COLOR,
-            wraplength=550,
+            wraplength=580,
             justify=tk.CENTER,
         )
         self.uac_label.pack(pady=(12, 16))
@@ -188,12 +188,9 @@ class WelcomePage(BasePage):
         SettingsDialog(self, self.controller)
 
     def _go_to_management(self) -> None:
-        """Doğrudan bitiş / yönetim sayfasına geçer ve NodeManager diyaloğunu açar."""
+        """Doğrudan bitiş / canlı durum yönetimi sayfasına geçer."""
         if self.controller:
             self.controller.go_to_page("finish")
-            finish_page = self.controller._pages.get("finish")
-            if finish_page and hasattr(finish_page, "_open_node_manager"):
-                finish_page.after(150, finish_page._open_node_manager)
 
     def on_enter(self) -> None:
         """Sayfa gösterildiğinde mevcut kurulum kontrolü yap."""
@@ -212,11 +209,24 @@ class WelcomePage(BasePage):
                     except Exception:
                         pass
 
-                date_str = data.get("install_date", t("welcome_unknown_date"))
+                raw_date = data.get("install_date", "")
+                if raw_date and "T" in raw_date:
+                    date_str = raw_date.replace("T", " ")[:19]
+                else:
+                    date_str = raw_date or t("welcome_unknown_date")
 
                 dev_id_str = f"\n• {t('welcome_device_id_label')}: {dev_id}" if dev_id else ""
-                desc_text = f"{t('welcome_existing_desc')}\n\n• {t('finish_role')}: {role_txt}\n• {t('install_date_label')}: {date_str}{dev_id_str}"
+                desc_text = (
+                    f"{t('welcome_existing_desc')}\n\n"
+                    f"• {t('finish_role')}: {role_txt}\n"
+                    f"• {t('install_date_label')}: {date_str}{dev_id_str}"
+                )
                 self.existing_info_label.config(text=desc_text)
+
+                if role == "secondary":
+                    self.manage_btn.config(text=t("btn_go_to_status"))
+                else:
+                    self.manage_btn.config(text=t("btn_go_to_manage"))
 
                 self.normal_info_card.pack_forget()
                 self.next_btn.pack_forget()
