@@ -23,8 +23,10 @@ a = Analysis(
     pathex=[SPECPATH],
     binaries=[],
     datas=[
-        # Assets - icon ve nssm.exe (HATA-06: nssm.exe eklendi)
+        # Assets - icon, logo ve nssm.exe (HATA-06: nssm.exe eklendi)
         ('assets/icon.ico', 'assets'),
+        ('assets/logo.png', 'assets'),
+        ('assets/banner.png', 'assets'),
         ('assets/nssm.exe', 'assets'),
     ],
     hiddenimports=[
