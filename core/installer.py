@@ -242,20 +242,20 @@ class InstallerEngine:
         folder_id = "auto-home-web"
         label = "AHWS Web Site"
 
-        existing_sec_ids: list[str] = []
+        existing_sec_ids: set[str] = set()
         try:
             prev = self.config_manager.load()
             for did in prev.get("secondary_device_ids", []):
-                if did and did != config.local_device_id and did not in existing_sec_ids:
-                    existing_sec_ids.append(did)
+                if did and did != config.local_device_id:
+                    existing_sec_ids.add(did)
         except Exception:
             pass
 
         try:
             for dev in self.syncthing_service.get_devices():
                 did = dev.get("deviceID", "")
-                if did and did != config.local_device_id and did not in existing_sec_ids:
-                    existing_sec_ids.append(did)
+                if did and did != config.local_device_id:
+                    existing_sec_ids.add(did)
         except Exception:
             pass
 
@@ -263,7 +263,7 @@ class InstallerEngine:
             self.syncthing_service.share_folder(
                 folder_id=folder_id,
                 folder_path=config.site_root_path,
-                device_ids=existing_sec_ids,
+                device_ids=list(existing_sec_ids),
                 label=label,
             )
             logger.info("Merkez site klasörü Syncthing'de paylaşıldı")
