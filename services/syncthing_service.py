@@ -669,21 +669,29 @@ class SyncthingService:
     def update_folder_path(self, folder_id: str, new_path: str) -> None:
         """Paylaşılan klasörün disk üzerindeki yolunu günceller."""
         try:
-            folders = self.get_folders()
-            for folder in folders:
-                if folder.get("id") == folder_id:
-                    folder["path"] = new_path
-                    response = requests.put(
-                        f"{self.api_base}/rest/config/folders/{folder_id}",
-                        headers=self._headers,
-                        json=folder,
-                        timeout=10,
-                    )
-                    response.raise_for_status()
-                    logger.info(f"Syncthing klasör yolu güncellendi: {folder_id} → {new_path}")
-                    return
-            # Klasör henüz yoksa oluştur
-            self.share_folder(folder_id=folder_id, folder_path=new_path, device_ids=[], label="AHWS Web Site")
+            self.sync_credentials_from_config()
+            response = requests.get(
+                f"{self.api_base}/rest/config/folders/{folder_id}",
+                headers=self._headers,
+                timeout=10,
+            )
+
+            if response.status_code == 200:
+                folder = response.json()
+                folder["path"] = new_path
+                put_response = requests.put(
+                    f"{self.api_base}/rest/config/folders/{folder_id}",
+                    headers=self._headers,
+                    json=folder,
+                    timeout=10,
+                )
+                put_response.raise_for_status()
+                logger.info(f"Syncthing klasör yolu güncellendi: {folder_id} → {new_path}")
+            elif response.status_code == 404:
+                # Klasör henüz yoksa oluştur
+                self.share_folder(folder_id=folder_id, folder_path=new_path, device_ids=[], label="AHWS Web Site")
+            else:
+                response.raise_for_status()
         except Exception as e:
             logger.warning(f"Syncthing klasör yolu güncellenemedi: {e}")
 
