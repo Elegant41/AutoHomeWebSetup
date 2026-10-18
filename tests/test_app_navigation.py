@@ -57,6 +57,24 @@ class TestInstallConfigRoundtrip(unittest.TestCase):
         """NodeRole.SECONDARY.value 'secondary' olmali."""
         self.assertEqual(NodeRole.SECONDARY.value, "secondary")
 
+    def test_generate_join_key_invalid_inputs(self):
+        """cloudflare_token veya primary_device_id bos/None ise bos string donmeli."""
+        dev_id = "AAAAAAA-BBBBBBB-CCCCCCC-DDDDDDD-EEEEEEE-FFFFFFF-GGGGGGG-HHHHHHH"
+        token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0ZXN0IjoxfQ.sig"
+
+        # Test with empty token
+        self.assertEqual(InstallConfig.generate_join_key("", dev_id), "")
+        # Test with None token
+        self.assertEqual(InstallConfig.generate_join_key(None, dev_id), "")
+        # Test with empty device id
+        self.assertEqual(InstallConfig.generate_join_key(token, ""), "")
+        # Test with None device id
+        self.assertEqual(InstallConfig.generate_join_key(token, None), "")
+        # Test with both empty
+        self.assertEqual(InstallConfig.generate_join_key("", ""), "")
+        # Test with both None
+        self.assertEqual(InstallConfig.generate_join_key(None, None), "")
+
     def test_join_key_roundtrip(self):
         """generate_join_key ve parse_join_key tam uyumlu olmali."""
         dev_id = "AAAAAAA-BBBBBBB-CCCCCCC-DDDDDDD-EEEEEEE-FFFFFFF-GGGGGGG-HHHHHHH"
