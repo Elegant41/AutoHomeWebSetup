@@ -201,6 +201,16 @@ class StyledButton(tk.Button):
         self.bind("<Leave>", self._on_leave)
         self.bind("<ButtonPress-1>", self._on_press)
         self.bind("<ButtonRelease-1>", self._on_release)
+        self.bind("<FocusIn>", self._on_focus_in)
+        self.bind("<FocusOut>", self._on_focus_out)
+
+    def _on_focus_in(self, _event=None) -> None:
+        if str(self["state"]) != "disabled":
+            self.config(bg=self._hover_bg)
+
+    def _on_focus_out(self, _event=None) -> None:
+        if str(self["state"]) != "disabled":
+            self.config(bg=self._bg)
 
     def _on_enter(self, _event=None) -> None:
         if str(self["state"]) != "disabled":
