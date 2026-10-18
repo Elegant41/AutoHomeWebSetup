@@ -453,51 +453,55 @@ class SyncthingService:
         try:
             # Mevcut cihazları al
             devices = self.get_devices()
+            needs_update = False
+            device_exists = False
 
             # Cihaz zaten ekli mi?
             for device in devices:
                 if device.get("deviceID") == device_id:
+                    device_exists = True
                     if auto_accept and not device.get("autoAcceptFolders"):
                         device["autoAcceptFolders"] = True
-                        requests.put(
-                            f"{self.api_base}/rest/config/devices",
-                            headers=self._headers,
-                            json=devices,
-                            timeout=10,
-                        ).raise_for_status()
-                    logger.info(f"Cihaz zaten ekli: {device_id[:12]}...")
-                    return
+                        needs_update = True
+                    break
 
-            # Yeni cihaz oluştur
-            new_device = {
-                "deviceID": device_id,
-                "name": name or f"Yedek Düğüm {len(devices)}",
-                "addresses": ["dynamic"],
-                "compression": "metadata",
-                "certName": "",
-                "introducer": False,
-                "skipIntroductionRemovals": False,
-                "paused": False,
-                "sharedFolders": [],
-                "autoAcceptFolders": auto_accept,
-                "maxSendKbps": 0,
-                "maxRecvKbps": 0,
-                "maxRequestKiB": 0,
-                "untrusted": False,
-                "remoteGUIAddress": "",
-            }
+            if not device_exists:
+                # Yeni cihaz oluştur
+                new_device = {
+                    "deviceID": device_id,
+                    "name": name or f"Yedek Düğüm {len(devices)}",
+                    "addresses": ["dynamic"],
+                    "compression": "metadata",
+                    "certName": "",
+                    "introducer": False,
+                    "skipIntroductionRemovals": False,
+                    "paused": False,
+                    "sharedFolders": [],
+                    "autoAcceptFolders": auto_accept,
+                    "maxSendKbps": 0,
+                    "maxRecvKbps": 0,
+                    "maxRequestKiB": 0,
+                    "untrusted": False,
+                    "remoteGUIAddress": "",
+                }
+                devices.append(new_device)
+                needs_update = True
 
-            devices.append(new_device)
+            if needs_update:
+                # HATA-03: PUT payload direkt liste olmalı, dict değil
+                # Unified single PUT point
+                response = requests.put(
+                    f"{self.api_base}/rest/config/devices",
+                    headers=self._headers,
+                    json=devices,  # Direkt liste gönder
+                    timeout=10,
+                )
+                response.raise_for_status()
 
-            # HATA-03: PUT payload direkt liste olmalı, dict değil
-            response = requests.put(
-                f"{self.api_base}/rest/config/devices",
-                headers=self._headers,
-                json=devices,  # Direkt liste gönder
-                timeout=10,
-            )
-            response.raise_for_status()
-            logger.info(f"Syncthing cihaz eklendi: {device_id[:12]}... ({name or 'İsimsiz'})")
+            if device_exists:
+                logger.info(f"Cihaz zaten ekli: {device_id[:12]}...")
+            else:
+                logger.info(f"Syncthing cihaz eklendi: {device_id[:12]}... ({name or 'İsimsiz'})")
 
         except requests.RequestException as e:
             raise ServiceError(f"Syncthing cihaz eklenemedi: {e}") from e
