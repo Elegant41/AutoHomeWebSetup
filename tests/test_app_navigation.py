@@ -79,6 +79,56 @@ class TestInstallConfigRoundtrip(unittest.TestCase):
         self.assertIsNone(InstallConfig.parse_join_key("INVALID-KEY"))
         self.assertIsNone(InstallConfig.parse_join_key("AHWS1-invalid_base64"))
 
+    def test_generate_join_key_empty_inputs(self):
+        """Bos token veya device_id ile uretim yapilmamali."""
+        self.assertEqual(InstallConfig.generate_join_key("", "device_id"), "")
+        self.assertEqual(InstallConfig.generate_join_key("token", ""), "")
+
+    def test_parse_join_key_empty_inputs(self):
+        """Bos join_key None dondurmeli."""
+        self.assertIsNone(InstallConfig.parse_join_key(""))
+        self.assertIsNone(InstallConfig.parse_join_key(None))
+
+    def test_parse_join_key_no_content(self):
+        """Sadece prefix iceren join_key None dondurmeli."""
+        from utils.constants import JOIN_KEY_PREFIX
+        self.assertIsNone(InstallConfig.parse_join_key(JOIN_KEY_PREFIX))
+
+    def test_parse_join_key_invalid_payload_type(self):
+        """Payload sozluk degilse None dondurmeli."""
+        import json
+        import zlib
+        import base64
+        from utils.constants import JOIN_KEY_PREFIX
+
+        raw_bytes = json.dumps(["not", "a", "dict"]).encode("utf-8")
+        compressed = zlib.compress(raw_bytes, level=9)
+        encoded = base64.urlsafe_b64encode(compressed).decode("ascii").rstrip("=")
+        key = f"{JOIN_KEY_PREFIX}{encoded}"
+
+        self.assertIsNone(InstallConfig.parse_join_key(key))
+
+    def test_parse_join_key_missing_required_fields(self):
+        """Gerekli alanlar eksikse None dondurmeli."""
+        import json
+        import zlib
+        import base64
+        from utils.constants import JOIN_KEY_PREFIX
+
+        payload_missing_t = {"d": "device_id", "p": 80, "u": "domain.com"}
+        raw_bytes1 = json.dumps(payload_missing_t).encode("utf-8")
+        compressed1 = zlib.compress(raw_bytes1, level=9)
+        encoded1 = base64.urlsafe_b64encode(compressed1).decode("ascii").rstrip("=")
+        key1 = f"{JOIN_KEY_PREFIX}{encoded1}"
+        self.assertIsNone(InstallConfig.parse_join_key(key1))
+
+        payload_missing_d = {"t": "token", "p": 80, "u": "domain.com"}
+        raw_bytes2 = json.dumps(payload_missing_d).encode("utf-8")
+        compressed2 = zlib.compress(raw_bytes2, level=9)
+        encoded2 = base64.urlsafe_b64encode(compressed2).decode("ascii").rstrip("=")
+        key2 = f"{JOIN_KEY_PREFIX}{encoded2}"
+        self.assertIsNone(InstallConfig.parse_join_key(key2))
+
 
 class TestPageNavigationLogic(unittest.TestCase):
     """
