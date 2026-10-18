@@ -89,5 +89,42 @@ class TestCheckTCPConnection(unittest.TestCase):
         self.assertTrue(result)
 
 
+class TestCheckLocalHttpHealth(unittest.TestCase):
+    @patch("utils.network.urllib.request.urlopen")
+    def test_check_local_http_health_success_first(self, mock_urlopen):
+        mock_resp = MagicMock()
+        mock_resp.status = 200
+        mock_urlopen.return_value.__enter__.return_value = mock_resp
+
+        from utils.network import check_local_http_health
+        self.assertTrue(check_local_http_health(80))
+
+    @patch("utils.network.urllib.request.urlopen")
+    def test_check_local_http_health_fails(self, mock_urlopen):
+        mock_urlopen.side_effect = Exception("Connection refused")
+
+        from utils.network import check_local_http_health
+        self.assertFalse(check_local_http_health(80))
+
+    @patch("utils.network.urllib.request.urlopen")
+    def test_check_local_http_health_success_second(self, mock_urlopen):
+        # First call fails, second succeeds
+        mock_resp = MagicMock()
+        mock_resp.status = 200
+
+        def side_effect(url, timeout):
+            if "ahws-health" in url:
+                raise Exception("Not found")
+            else:
+                mock_ctx = MagicMock()
+                mock_ctx.__enter__.return_value = mock_resp
+                return mock_ctx
+
+        mock_urlopen.side_effect = side_effect
+
+        from utils.network import check_local_http_health
+        self.assertTrue(check_local_http_health(80))
+
+
 if __name__ == "__main__":
     unittest.main()
