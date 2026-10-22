@@ -228,7 +228,8 @@ class SettingsDialog(tk.Toplevel):
         try:
             clip = self.clipboard_get().strip()
             if clip:
-                self.token_var.set(clip)
+                cleaned = constants.clean_cloudflare_token(clip)
+                self.token_var.set(cleaned)
         except Exception:
             pass
 
@@ -293,7 +294,8 @@ class SettingsDialog(tk.Toplevel):
                 messagebox.showerror(t("settings_error_title"), t("err_no_index", index_path=index_path), parent=self)
                 return False
 
-        token = self.token_var.get().strip()
+        token = constants.clean_cloudflare_token(self.token_var.get().strip())
+        self.token_var.set(token)
         if not token or not re.match(constants.CLOUDFLARE_TOKEN_REGEX, token):
             messagebox.showerror(t("settings_error_title"), t("err_invalid_token"), parent=self)
             return False
@@ -317,7 +319,7 @@ class SettingsDialog(tk.Toplevel):
             return
 
         new_folder = self.folder_var.get().strip()
-        new_token = self.token_var.get().strip()
+        new_token = constants.clean_cloudflare_token(self.token_var.get().strip())
         new_domain = self.domain_var.get().strip()
         new_port = int(self.port_var.get().strip())
 

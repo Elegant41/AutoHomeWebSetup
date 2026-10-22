@@ -66,6 +66,44 @@ class TestConfigManager(unittest.TestCase):
         self.manager.update_created_directories(dirs)
         self.assertEqual(self.manager.get_created_directories(), dirs)
 
+    def test_legacy_fernet_token_decryption(self):
+        """Eski Fernet şifreli token'ın otomatik çözülüp temiz kaydedilmesi testi."""
+        try:
+            from cryptography.fernet import Fernet
+        except ImportError:
+            self.skipTest("cryptography yüklü değil")
+
+        # 1. Anahtar oluştur ve temp_dir içine secret.key olarak yaz
+        key = Fernet.generate_key()
+        key_path = self.temp_dir / "secret.key"
+        key_path.write_bytes(key)
+
+        # 2. Örnek bir eyJ... token'ını Fernet ile şifrele
+        real_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMC6Y5bP3iRo7KspEVvo5iUh4A-M"
+        fernet = Fernet(key)
+        encrypted_token = fernet.encrypt(real_token.encode("utf-8")).decode("utf-8")
+        self.assertTrue(encrypted_token.startswith("gAAAAAB"))
+
+        # 3. Diske legacy şifreli biçimde yaz
+        legacy_data = {
+            "cloudflare_token": encrypted_token,
+            "_is_encrypted": True,
+            "node_role": "primary",
+        }
+        with open(self.config_path, "w", encoding="utf-8") as f:
+            json.dump(legacy_data, f)
+
+        # 4. ConfigManager.load() çağrıldığında otomatik çözülmeli
+        loaded = self.manager.load()
+        self.assertEqual(loaded.get("cloudflare_token"), real_token)
+        self.assertNotIn("_is_encrypted", loaded)
+
+        # 5. Dosyanın diske de çözülmüş olarak tekrar yazıldığını doğrula
+        with open(self.config_path, "r", encoding="utf-8") as f:
+            persisted = json.load(f)
+        self.assertEqual(persisted.get("cloudflare_token"), real_token)
+        self.assertNotIn("_is_encrypted", persisted)
+
 
 if __name__ == "__main__":
     unittest.main()

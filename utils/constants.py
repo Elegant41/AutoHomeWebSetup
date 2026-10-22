@@ -111,4 +111,16 @@ DEVICE_ID_REGEX = r"^[A-Z0-9]{7}(-[A-Z0-9]{7}){7}$"
 
 # ─── Cloudflare Tunnel Token Regex ────────────────────────────────────
 # Token formatı: eyJ... (Base64 veya JWT formatında)
-CLOUDFLARE_TOKEN_REGEX = r"^eyJ[A-Za-z0-9\-_=.]+$"
+CLOUDFLARE_TOKEN_REGEX = r"^eyJ[A-Za-z0-9\-_=.+/]+$"
+
+
+def clean_cloudflare_token(raw: str) -> str:
+    """Yapıştırılan metinden (komut, tırnak, boşluk vb. dahil) temiz token'ı ayıklar."""
+    import re
+    if not raw:
+        return ""
+    stripped = raw.strip().strip('"\'')
+    match = re.search(r"eyJ[A-Za-z0-9\-_=.+/]+", stripped)
+    if match:
+        return match.group(0)
+    return stripped

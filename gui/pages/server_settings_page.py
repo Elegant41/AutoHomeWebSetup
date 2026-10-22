@@ -296,7 +296,8 @@ class ServerSettingsPage(BasePage):
         try:
             clip = self.clipboard_get().strip()
             if clip:
-                self.token_var.set(clip)
+                cleaned = constants.clean_cloudflare_token(clip)
+                self.token_var.set(cleaned)
         except Exception:
             pass
 
@@ -392,7 +393,8 @@ class ServerSettingsPage(BasePage):
             if saved.get("site_root_path"):
                 self.folder_var.set(saved["site_root_path"])
             if saved.get("cloudflare_token"):
-                self.token_var.set(saved["cloudflare_token"])
+                token = constants.clean_cloudflare_token(saved["cloudflare_token"])
+                self.token_var.set(token)
             if saved.get("public_domain") is not None:
                 self.domain_var.set(saved["public_domain"])
             if saved.get("caddy_port"):
@@ -433,7 +435,8 @@ class ServerSettingsPage(BasePage):
             if not index_path.is_file():
                 return False, t("err_no_index", index_path=index_path)
 
-        token = self.token_var.get().strip()
+        token = constants.clean_cloudflare_token(self.token_var.get().strip())
+        self.token_var.set(token)
         if not token:
             return False, t("err_no_token")
         if not re.match(constants.CLOUDFLARE_TOKEN_REGEX, token):
@@ -454,7 +457,7 @@ class ServerSettingsPage(BasePage):
         """Sayfa verilerini döndürür."""
         return {
             "site_root_path": self.folder_var.get().strip(),
-            "cloudflare_token": self.token_var.get().strip(),
+            "cloudflare_token": constants.clean_cloudflare_token(self.token_var.get().strip()),
             "public_domain": self.domain_var.get().strip(),
             "caddy_port": int(self.port_var.get() or constants.CADDY_DEFAULT_PORT),
             "prevent_sleep": bool(self.prevent_sleep_var.get()),

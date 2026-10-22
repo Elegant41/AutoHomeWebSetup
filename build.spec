@@ -53,6 +53,8 @@ a = Analysis(
         'requests',
         'certifi',
         'xml.etree.ElementTree',
+        'cryptography',
+        'cryptography.fernet',
     ],
     hookspath=[],
     hooksconfig={},
