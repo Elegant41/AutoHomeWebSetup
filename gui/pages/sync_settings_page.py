@@ -331,21 +331,27 @@ class SyncSettingsPage(BasePage):
             if dev_id:
                 self.device_id_var.set(dev_id)
 
-            if self.controller:
-                existing_server = dict(self.controller.get_saved_page_data("server_settings") or {})
-                if payload.get("cloudflare_token"):
-                    existing_server["cloudflare_token"] = payload["cloudflare_token"]
-                if payload.get("caddy_port"):
-                    existing_server["caddy_port"] = int(payload["caddy_port"])
-                if payload.get("public_domain") is not None:
-                    existing_server["public_domain"] = payload.get("public_domain", "")
-                if not existing_server.get("site_root_path"):
-                    existing_server["site_root_path"] = str(constants.SITE_DIR)
-                self.controller.collect_page_data("server_settings", existing_server)
+            self._update_server_settings_from_payload(payload)
 
             self.join_key_status.config(text=t("sync_join_key_applied"), fg=theme.SUCCESS_COLOR)
         except Exception:
             self.join_key_status.config(text=t("err_invalid_join_key"), fg=theme.ERROR_COLOR)
+
+    def _update_server_settings_from_payload(self, payload: dict) -> None:
+        """Controller üzerinden server ayarlarını join_key payload'una göre günceller."""
+        if not self.controller:
+            return
+
+        existing_server = dict(self.controller.get_saved_page_data("server_settings") or {})
+        if payload.get("cloudflare_token"):
+            existing_server["cloudflare_token"] = payload["cloudflare_token"]
+        if payload.get("caddy_port"):
+            existing_server["caddy_port"] = int(payload["caddy_port"])
+        if payload.get("public_domain") is not None:
+            existing_server["public_domain"] = payload.get("public_domain", "")
+        if not existing_server.get("site_root_path"):
+            existing_server["site_root_path"] = str(constants.SITE_DIR)
+        self.controller.collect_page_data("server_settings", existing_server)
 
     def _on_install_clicked(self) -> None:
         """İleri butonuna tıklandığında."""
