@@ -114,6 +114,31 @@ class App(tk.Tk):
         self.show_page(WelcomePage.PAGE_NAME)
 
     # ─── Sayfa Yönetimi ─────────────────────────────────────────────
+    def _hide_page(self, page: tk.Frame) -> None:
+        """Belirtilen sayfayı arayüzden gizler ve on_leave tetikler."""
+        try:
+            page.pack_forget()
+            if hasattr(page, "on_leave"):
+                page.on_leave()
+        except Exception as e:
+            logger.error(f"{getattr(page, 'PAGE_NAME', 'Bilinmeyen')} sayfasından çıkılırken hata: {e}")
+
+    def _show_page_ui(self, page: tk.Frame, name: str | None = None) -> None:
+        """Belirtilen sayfayı arayüzde gösterir ve on_enter tetikler."""
+        try:
+            page.pack(fill=tk.BOTH, expand=True)
+            page.tkraise()
+
+            if name and hasattr(self, "_step_bar") and self._step_bar:
+                self._step_bar.set_active_step(name)
+
+            if hasattr(page, "on_enter"):
+                page.on_enter()
+        except Exception as e:
+            logger.error(f"{getattr(page, 'PAGE_NAME', 'Bilinmeyen')} sayfasına girilirken hata: {e}")
+            import traceback
+            traceback.print_exc()
+
     def register_page(self, name: str, page: tk.Frame) -> None:
         """Bir sayfayı kaydeder."""
         self._pages[name] = page
@@ -129,30 +154,14 @@ class App(tk.Tk):
             current = self._page_stack[-1]
             if current is page:  # Zaten bu sayfa gösterimde
                 return
-            try:
-                current.pack_forget()
-                if hasattr(current, "on_leave"):
-                    current.on_leave()
-            except Exception as e:
-                logger.error(f"{current.PAGE_NAME} sayfasından çıkılırken hata: {e}")
+            self._hide_page(current)
+
+        # Eğer stack'te zaten varsa (geri navigasyon) ekleme
+        if not self._page_stack or self._page_stack[-1] is not page:
+            self._page_stack.append(page)
 
         # Yeni sayfayı göster
-        try:
-            page.pack(fill=tk.BOTH, expand=True)
-            page.tkraise()
-            # Eğer stack'te zaten varsa (geri navigasyon) ekleme
-            if not self._page_stack or self._page_stack[-1] is not page:
-                self._page_stack.append(page)
-
-            if hasattr(self, "_step_bar") and self._step_bar:
-                self._step_bar.set_active_step(name)
-
-            if hasattr(page, "on_enter"):
-                page.on_enter()
-        except Exception as e:
-            logger.error(f"{page.PAGE_NAME} sayfasına girilirken hata: {e}")
-            import traceback
-            traceback.print_exc()
+        self._show_page_ui(page, name)
 
     def next_page(self) -> None:
         """
@@ -189,35 +198,17 @@ class App(tk.Tk):
             return
 
         current = self._page_stack.pop()
-        try:
-            current.pack_forget()
-            if hasattr(current, "on_leave"):
-                current.on_leave()
-        except Exception as e:
-            logger.error(f"{current.PAGE_NAME} sayfasından çıkılırken hata: {e}")
+        self._hide_page(current)
 
         previous = self._page_stack[-1]
-        try:
-            previous.pack(fill=tk.BOTH, expand=True)
-            previous.tkraise()
-            prev_name = self._find_page_name(previous)
-            if prev_name and hasattr(self, "_step_bar") and self._step_bar:
-                self._step_bar.set_active_step(prev_name)
-            if hasattr(previous, "on_enter"):
-                previous.on_enter()
-        except Exception as e:
-            logger.error(f"{previous.PAGE_NAME} sayfasına girilirken hata: {e}")
+        prev_name = self._find_page_name(previous)
+        self._show_page_ui(previous, prev_name)
 
     def go_to_page(self, name: str) -> None:
         """Belirtilen sayfaya doğrudan geçer (back stack temizlenir)."""
         if self._page_stack:
             current = self._page_stack[-1]
-            try:
-                current.pack_forget()
-                if hasattr(current, "on_leave"):
-                    current.on_leave()
-            except Exception as e:
-                logger.error(f"{current.PAGE_NAME} sayfasından çıkılırken hata: {e}")
+            self._hide_page(current)
 
         self._page_stack.clear()
         self.show_page(name)
@@ -276,12 +267,7 @@ class App(tk.Tk):
         # Sayfa yığınını (back history) koruyarak kaldığımız sayfaya git
         if stack_names:
             for p in list(self._page_stack):
-                try:
-                    p.pack_forget()
-                    if hasattr(p, "on_leave"):
-                        p.on_leave()
-                except Exception:
-                    pass
+                self._hide_page(p)
             self._page_stack.clear()
             for pname in stack_names[:-1]:
                 if pname in self._pages:
