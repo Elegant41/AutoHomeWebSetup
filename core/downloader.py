@@ -218,6 +218,36 @@ class Downloader:
         logger.info(f"SHA256 doğrulandı: {file_path.name}")
         return True
 
+    def _find_windows_asset_info(
+        self, assets: list[dict], expected_ext: str
+    ) -> tuple[str, str]:
+        """
+        Windows amd64 mimarisi için uygun asset'i bulur.
+
+        Args:
+            assets: GitHub release asset listesi
+            expected_ext: Beklenen dosya uzantısı (ör. '.zip', '.exe')
+
+        Returns:
+            tuple[str, str]: (download_url, digest) veya bulunamazsa ("", "")
+        """
+        for asset in assets:
+            asset_name = asset.get("name", "")
+            if "windows" not in asset_name.lower() or "amd64" not in asset_name.lower():
+                continue
+
+            if expected_ext and not asset_name.lower().endswith(expected_ext.lower()):
+                continue
+
+            download_url = asset.get("browser_download_url", "")
+            if not download_url:
+                continue
+
+            digest = asset.get("digest", "")
+            return download_url, digest
+
+        return "", ""
+
     def get_latest_release_url(
         self, repo_api: str, download_pattern: str, expected_ext: str = ""
     ) -> tuple[str, str]:
@@ -246,17 +276,12 @@ class Downloader:
 
             # Windows amd64 asset'ini bul
             assets = data.get("assets", [])
-            for asset in assets:
-                asset_name = asset.get("name", "")
-                if "windows" in asset_name.lower() and "amd64" in asset_name.lower():
-                    if expected_ext and not asset_name.lower().endswith(expected_ext.lower()):
-                        continue
-                    download_url = asset.get("browser_download_url", "")
-                    if download_url:
-                        digest = asset.get("digest", "")
-                        if isinstance(digest, str) and digest.lower().startswith("sha256:"):
-                            self._expected_hashes[download_url] = digest.split(":", 1)[1].strip()
-                        return download_url, version
+            download_url, digest = self._find_windows_asset_info(assets, expected_ext)
+
+            if download_url:
+                if isinstance(digest, str) and digest.lower().startswith("sha256:"):
+                    self._expected_hashes[download_url] = digest.split(":", 1)[1].strip()
+                return download_url, version
 
             # Asset bulunamadıysa şablonu kullan
             download_url = download_pattern.format(version=version)
