@@ -112,96 +112,61 @@ class SyncthingService:
             self.gui_port = real_port
             self.api_base = f"http://127.0.0.1:{self.gui_port}"
 
-    # ─── İlk Yapılandırma ───────────────────────────────────────────
-    def generate_initial_config(
-        self,
-        home_dir: Optional[Path] = None,
-        gui_port: Optional[int] = None,
-        api_key: Optional[str] = None,
-        default_folder_path: Optional[str] = None,
-    ) -> Path:
+
+
+    def _update_existing_config(self, config_path: Path, gui_port: int, api_key: str, default_dir_clean: str) -> bool:
         """
-        Syncthing'in ilk yapılandırmasını üretir veya mevcut config.xml'i
-        eşleşmiş cihazları ve klasörleri koruyarak günceller.
-
-        Args:
-            home_dir: Syncthing home dizini
-            gui_port: GUI/API portu
-            api_key: API anahtarı
-            default_folder_path: Otomatik kabul edilen klasörler için varsayılan dizin
-
-        Returns:
-            Path: config.xml yolu
+        Mevcut config.xml dosyasını ayrıştırır ve günceller.
+        Başarılı olursa True, aksi halde False döner.
         """
         import xml.etree.ElementTree as ET
 
-        home_dir = home_dir or self.home_dir
-        gui_port = gui_port or constants.SYNCTHING_GUI_PORT
-        api_key = api_key or self.api_key
-        self.api_key = api_key
-        self._headers["X-API-Key"] = api_key
+        try:
+            tree = ET.parse(config_path)
+            root = tree.getroot()
+            if root.tag == "configuration":
+                gui_el = root.find("gui")
+                if gui_el is None:
+                    gui_el = ET.SubElement(root, "gui")
+                gui_el.set("enabled", "true")
+                gui_el.set("tls", "false")
 
-        home_dir.mkdir(parents=True, exist_ok=True)
-        config_path = home_dir / "config.xml"
+                addr_el = gui_el.find("address")
+                if addr_el is None:
+                    addr_el = ET.SubElement(gui_el, "address")
+                addr_el.text = f"127.0.0.1:{gui_port}"
 
-        # Port çakışması kontrolü: hedef port meşgulse alternatif kullan
-        if not is_port_available(gui_port, "127.0.0.1"):
-            alt_port = find_available_port(constants.SYNCTHING_GUI_PORT_ALT)
-            if alt_port > 0:
-                gui_port = alt_port
-                self.gui_port = gui_port
-                self.api_base = f"http://127.0.0.1:{self.gui_port}"
-                logger.info(f"Syncthing portu çakışması, alternatif port kullanılıyor: {gui_port}")
-        else:
-            self.gui_port = gui_port
-            self.api_base = f"http://127.0.0.1:{self.gui_port}"
+                key_el = gui_el.find("apikey")
+                if key_el is None:
+                    key_el = ET.SubElement(gui_el, "apikey")
+                key_el.text = api_key
 
-        default_dir = Path(default_folder_path) if default_folder_path else constants.SITE_DIR
-        default_dir_clean = str(default_dir.resolve()).replace("\\", "/")
+                opts_el = root.find("options")
+                if opts_el is None:
+                    opts_el = ET.SubElement(root, "options")
+                def_path_el = opts_el.find("defaultFolderPath")
+                if def_path_el is None:
+                    def_path_el = ET.SubElement(opts_el, "defaultFolderPath")
+                def_path_el.text = default_dir_clean
 
-        # Eğer geçerli bir config.xml zaten varsa, cihaz ve klasörleri koruyarak güncelle
-        if config_path.exists():
-            try:
-                tree = ET.parse(config_path)
-                root = tree.getroot()
-                if root.tag == "configuration":
-                    gui_el = root.find("gui")
-                    if gui_el is None:
-                        gui_el = ET.SubElement(root, "gui")
-                    gui_el.set("enabled", "true")
-                    gui_el.set("tls", "false")
+                defaults_el = root.find("defaults")
+                if defaults_el is not None:
+                    def_folder = defaults_el.find("folder")
+                    if def_folder is not None:
+                        def_folder.set("path", default_dir_clean)
 
-                    addr_el = gui_el.find("address")
-                    if addr_el is None:
-                        addr_el = ET.SubElement(gui_el, "address")
-                    addr_el.text = f"127.0.0.1:{gui_port}"
+                tree.write(config_path, encoding="utf-8", xml_declaration=True)
+                logger.info(f"Mevcut Syncthing yapılandırması korunarak güncellendi: {config_path}")
+                return True
+        except Exception as e:
+            logger.warning(f"Mevcut config.xml ayrıştırılamadı, sıfırdan oluşturuluyor: {e}")
+        return False
 
-                    key_el = gui_el.find("apikey")
-                    if key_el is None:
-                        key_el = ET.SubElement(gui_el, "apikey")
-                    key_el.text = api_key
 
-                    opts_el = root.find("options")
-                    if opts_el is None:
-                        opts_el = ET.SubElement(root, "options")
-                    def_path_el = opts_el.find("defaultFolderPath")
-                    if def_path_el is None:
-                        def_path_el = ET.SubElement(opts_el, "defaultFolderPath")
-                    def_path_el.text = default_dir_clean
-
-                    defaults_el = root.find("defaults")
-                    if defaults_el is not None:
-                        def_folder = defaults_el.find("folder")
-                        if def_folder is not None:
-                            def_folder.set("path", default_dir_clean)
-
-                    tree.write(config_path, encoding="utf-8", xml_declaration=True)
-                    logger.info(f"Mevcut Syncthing yapılandırması korunarak güncellendi: {config_path}")
-                    return config_path
-            except Exception as e:
-                logger.warning(f"Mevcut config.xml ayrıştırılamadı, sıfırdan oluşturuluyor: {e}")
-
-        # Modern Syncthing (v2.x - version 52) config.xml şablonu
+    def _create_new_config(self, config_path: Path, gui_port: int, api_key: str, default_dir_clean: str) -> None:
+        """
+        Yeni bir config.xml dosyası oluşturur.
+        """
         config_template = f"""<?xml version="1.0" encoding="utf-8"?>
 <configuration version="52">
     <gui enabled="true" tls="false" debugging="false" sendBasicAuthPrompt="false" theme="default">
@@ -228,9 +193,67 @@ class SyncthingService:
     </defaults>
 </configuration>
 """
-
         config_path.write_text(config_template, encoding="utf-8")
         logger.info(f"Syncthing ilk yapılandırma oluşturuldu: {config_path}")
+
+    def _resolve_gui_port(self, gui_port: int) -> int:
+        """
+        Port çakışması kontrolü: hedef port meşgulse alternatif kullanır.
+        """
+        if not is_port_available(gui_port, "127.0.0.1"):
+            alt_port = find_available_port(constants.SYNCTHING_GUI_PORT_ALT)
+            if alt_port > 0:
+                gui_port = alt_port
+                self.gui_port = gui_port
+                self.api_base = f"http://127.0.0.1:{self.gui_port}"
+                logger.info(f"Syncthing portu çakışması, alternatif port kullanılıyor: {gui_port}")
+                return gui_port
+
+        self.gui_port = gui_port
+        self.api_base = f"http://127.0.0.1:{self.gui_port}"
+        return gui_port
+
+    # ─── İlk Yapılandırma ───────────────────────────────────────────
+    def generate_initial_config(
+        self,
+        home_dir: Optional[Path] = None,
+        gui_port: Optional[int] = None,
+        api_key: Optional[str] = None,
+        default_folder_path: Optional[str] = None,
+    ) -> Path:
+        """
+        Syncthing'in ilk yapılandırmasını üretir veya mevcut config.xml'i
+        eşleşmiş cihazları ve klasörleri koruyarak günceller.
+
+        Args:
+            home_dir: Syncthing home dizini
+            gui_port: GUI/API portu
+            api_key: API anahtarı
+            default_folder_path: Otomatik kabul edilen klasörler için varsayılan dizin
+
+        Returns:
+            Path: config.xml yolu
+        """
+        home_dir = home_dir or self.home_dir
+        gui_port = gui_port or constants.SYNCTHING_GUI_PORT
+        api_key = api_key or self.api_key
+
+        self.api_key = api_key
+        self._headers["X-API-Key"] = api_key
+
+        home_dir.mkdir(parents=True, exist_ok=True)
+        config_path = home_dir / "config.xml"
+
+        gui_port = self._resolve_gui_port(gui_port)
+
+        default_dir = Path(default_folder_path) if default_folder_path else constants.SITE_DIR
+        default_dir_clean = str(default_dir.resolve()).replace("\\", "/")
+
+        if config_path.exists():
+            if self._update_existing_config(config_path, gui_port, api_key, default_dir_clean):
+                return config_path
+
+        self._create_new_config(config_path, gui_port, api_key, default_dir_clean)
         return config_path
 
     def cleanup_existing_syncthing(self) -> None:
