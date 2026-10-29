@@ -76,6 +76,55 @@ class Downloader:
             raise DownloadCancelledError("İndirme kullanıcı tarafından iptal edildi.")
 
     # ─── Genel İndirme ──────────────────────────────────────────────
+    def _cleanup_failed_download(self, dest: Path) -> None:
+        if dest.exists():
+            try:
+                dest.unlink()
+            except OSError:
+                pass
+
+    def _do_download_stream(
+        self,
+        response: requests.Response,
+        dest: Path,
+        progress_callback: ProgressCallback,
+        total_size: int,
+    ) -> None:
+        downloaded = 0
+        with open(dest, "wb") as f:
+            for chunk in response.iter_content(chunk_size=constants.DOWNLOAD_CHUNK_SIZE):
+                self._check_cancelled(dest)
+                if not chunk:
+                    continue
+                f.write(chunk)
+                downloaded += len(chunk)
+
+                if total_size > 0 and progress_callback:
+                    percent = int((downloaded / total_size) * 100)
+                    progress_callback(percent, f"İndiriliyor: {dest.name} (%{percent})")
+
+    def _verify_download_integrity(self, url: str, dest: Path, total_size: int) -> None:
+        if total_size > 0 and dest.stat().st_size != total_size:
+            raise DownloadError(
+                f"Dosya boyutu eşleşmiyor: {dest.stat().st_size} != {total_size}"
+            )
+
+        expected_sha256 = self._expected_hashes.get(url, "")
+        if expected_sha256:
+            self.verify_sha256(dest, expected_sha256)
+
+    def _handle_retry_wait(self, url: str, dest: Path, attempt: int, retry_count: int, retry_delay: int, e: Exception, progress_callback: ProgressCallback) -> None:
+        if attempt < retry_count:
+            wait = retry_delay * (2 ** (attempt - 1))
+            logger.warning(f"İndirme hatası (deneme {attempt}): {e}. {wait}s sonra tekrar...")
+            if progress_callback:
+                progress_callback(-1, f"Bağlantı hatası, {wait}s sonra tekrar deneniyor...")
+            for _ in range(int(wait * 10)):
+                self._check_cancelled(dest)
+                time.sleep(0.1)
+        else:
+            raise DownloadError(f"İndirme başarısız: {url} → {e}") from e
+
     def download_file(
         self,
         url: str,
@@ -98,10 +147,7 @@ class Downloader:
         Raises:
             DownloadError: İndirme başarısız olursa
         """
-        # Üst dizini oluştur
         dest.parent.mkdir(parents=True, exist_ok=True)
-
-        # Exponential backoff retry
         retry_count = constants.DOWNLOAD_RETRY_COUNT
         retry_delay = constants.DOWNLOAD_RETRY_DELAY
 
@@ -114,35 +160,14 @@ class Downloader:
 
                 with self._session.get(url, stream=True, timeout=timeout) as response:
                     response.raise_for_status()
-
                     total_size = int(response.headers.get("content-length", 0))
-                    downloaded = 0
 
-                    with open(dest, "wb") as f:
-                        for chunk in response.iter_content(chunk_size=constants.DOWNLOAD_CHUNK_SIZE):
-                            self._check_cancelled(dest)
-                            if not chunk:
-                                continue
-                            f.write(chunk)
-                            downloaded += len(chunk)
-
-                            if total_size > 0 and progress_callback:
-                                percent = int((downloaded / total_size) * 100)
-                                progress_callback(percent, f"İndiriliyor: {dest.name} (%{percent})")
+                    self._do_download_stream(response, dest, progress_callback, total_size)
 
                 if progress_callback:
                     progress_callback(100, f"İndirme tamamlandı: {dest.name}")
 
-                # Dosya boyutu kontrolü
-                if total_size > 0 and dest.stat().st_size != total_size:
-                    raise DownloadError(
-                        f"Dosya boyutu eşleşmiyor: {dest.stat().st_size} != {total_size}"
-                    )
-
-                # Eğer GitHub API'den SHA256 digest bilgisi alındıysa doğrula
-                expected_sha256 = self._expected_hashes.get(url, "")
-                if expected_sha256:
-                    self.verify_sha256(dest, expected_sha256)
+                self._verify_download_integrity(url, dest, total_size)
 
                 logger.info(f"İndirme başarılı: {dest} ({dest.stat().st_size} bayt)")
                 return dest
@@ -150,35 +175,13 @@ class Downloader:
             except DownloadCancelledError:
                 raise
             except HashMismatchError:
-                if dest.exists():
-                    try:
-                        dest.unlink()
-                    except OSError:
-                        pass
+                self._cleanup_failed_download(dest)
                 raise
             except requests.RequestException as e:
-                if dest.exists():
-                    try:
-                        dest.unlink()
-                    except OSError:
-                        pass
-                if attempt < retry_count:
-                    wait = retry_delay * (2 ** (attempt - 1))  # Exponential backoff
-                    logger.warning(f"İndirme hatası (deneme {attempt}): {e}. {wait}s sonra tekrar...")
-                    if progress_callback:
-                        progress_callback(-1, f"Bağlantı hatası, {wait}s sonra tekrar deneniyor...")
-                    for _ in range(int(wait * 10)):
-                        self._check_cancelled(dest)
-                        time.sleep(0.1)
-                else:
-                    raise DownloadError(f"İndirme başarısız: {url} → {e}") from e
-
+                self._cleanup_failed_download(dest)
+                self._handle_retry_wait(url, dest, attempt, retry_count, retry_delay, e, progress_callback)
             except OSError as e:
-                if dest.exists():
-                    try:
-                        dest.unlink()
-                    except OSError:
-                        pass
+                self._cleanup_failed_download(dest)
                 raise DownloadError(f"Dosya yazma hatası: {e}") from e
 
         raise DownloadError(f"İndirme başarısız: {url}")
