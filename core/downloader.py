@@ -167,9 +167,14 @@ class Downloader:
                     logger.warning(f"İndirme hatası (deneme {attempt}): {e}. {wait}s sonra tekrar...")
                     if progress_callback:
                         progress_callback(-1, f"Bağlantı hatası, {wait}s sonra tekrar deneniyor...")
-                    for _ in range(int(wait * 10)):
+
+                    if self.cancel_event:
+                        self.cancel_event.wait(wait)
                         self._check_cancelled(dest)
-                        time.sleep(0.1)
+                    else:
+                        for _ in range(int(wait * 10)):
+                            self._check_cancelled(dest)
+                            time.sleep(0.1)
                 else:
                     raise DownloadError(f"İndirme başarısız: {url} → {e}") from e
 
