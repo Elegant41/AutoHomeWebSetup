@@ -135,7 +135,7 @@ class SCService:
             if SCService.is_running(name):
                 logger.info(f"Servis başlatıldı ve aktif: {name}")
                 return
-            time.sleep(0.5)
+            time.sleep(0.1)
 
         if result.returncode != 0 and not SCService.is_running(name):
             raise ServiceError(f"Servis başlatılamadı ({name}): {output}")
@@ -288,7 +288,7 @@ class NSSMService:
             if SCService.is_running(name):
                 logger.info(f"NSSM servis başlatıldı ve aktif: {name}")
                 return
-            time.sleep(0.5)
+            time.sleep(0.1)
 
         if result.returncode != 0 and not SCService.is_running(name):
             raise ServiceError(
