@@ -571,69 +571,91 @@ class FinishPage(BasePage):
         self.refresh_health_status()
         self._auto_refresh_job = self.after(5000, self._schedule_periodic_refresh)
 
+    def _update_header_title(self) -> None:
+        """Update header based on navigation history."""
+        # Eğer kurulumdan hemen sonra gelindiyse başlığı "Kurulum Tamamlandı!",
+        # doğrudan kontrol paneli olarak açıldıysa "AHWS Canlı Yönetim ve Durum Paneli" yap
+        just_installed = len(getattr(self.controller, "_page_stack", [])) > 1
+        if just_installed:
+            self.header_title.config(text=t("finish_title"), fg=theme.SUCCESS_COLOR)
+        else:
+            self.header_title.config(text=t("control_center_title"), fg=theme.FG_COLOR)
+
+    def _get_role_string(self, config, saved: dict) -> str:
+        """Resolves the current node's role."""
+        role = getattr(config, "node_role", "primary")
+        role_str = role.value if hasattr(role, "value") else str(role)
+        if saved.get("node_role") and not self.controller.get_saved_page_data("sync_settings"):
+            role_str = saved["node_role"]
+        return role_str
+
+    def _get_device_id(self, config, saved: dict) -> str:
+        """Resolves the device ID, falling back to the Syncthing service if needed."""
+        device_id = getattr(config, "local_device_id", "") or ""
+        if not device_id:
+            device_id = saved.get("local_device_id", "")
+        if not device_id and hasattr(self.controller, "installer_engine"):
+            try:
+                device_id = self.controller.installer_engine.syncthing_service.get_device_id()
+            except Exception as e:
+                logger.warning(f"Syncthing servisinden Device ID okunamadı: {e}")
+        return device_id
+
+    def _update_summary_subtitle(self, config, saved: dict) -> None:
+        """Builds the summary subtitle text."""
+        domain = saved.get("public_domain", "") or getattr(config, "public_domain", "")
+        site_root = saved.get("site_root_path", "") or getattr(config, "site_root_path", "")
+
+        # Alt başlıkta aktif klasör ve domain özetini göster
+        summary_parts = [t("finish_success_msg")]
+        if site_root:
+            summary_parts.append(f"Klasör: {site_root}")
+        if domain:
+            summary_parts.append(f"Domain: {domain}")
+        self.header_subtitle.config(text="   |   ".join(summary_parts))
+
+    def _update_join_key(self, device_id: str, role_str: str, config, saved: dict) -> None:
+        """Generates and sets the join key if appropriate."""
+        token = saved.get("cloudflare_token", "") or getattr(config, "cloudflare_token", "")
+        port = saved.get("caddy_port", 0) or getattr(config, "caddy_port", 80)
+        domain = saved.get("public_domain", "") or getattr(config, "public_domain", "")
+
+        if device_id and token and role_str == "primary":
+            try:
+                from core.models import InstallConfig
+
+                self.join_key = InstallConfig.generate_join_key(
+                    primary_device_id=device_id,
+                    cloudflare_token=token,
+                    caddy_port=int(port),
+                    public_domain=domain,
+                )
+            except Exception:
+                self.join_key = ""
+        else:
+            self.join_key = ""
+
     # ─── BasePage Override'ları ─────────────────────────────────────
     def on_enter(self) -> None:
         """Sayfaya girildiğinde verileri yükle ve canlı izlemeyi başlat."""
         self._is_active = True
         if self.controller:
-            # Eğer kurulumdan hemen sonra gelindiyse başlığı "Kurulum Tamamlandı!",
-            # doğrudan kontrol paneli olarak açıldıysa "AHWS Canlı Yönetim ve Durum Paneli" yap
-            just_installed = len(getattr(self.controller, "_page_stack", [])) > 1
-            if just_installed:
-                self.header_title.config(text=t("finish_title"), fg=theme.SUCCESS_COLOR)
-            else:
-                self.header_title.config(text=t("control_center_title"), fg=theme.FG_COLOR)
+            self._update_header_title()
 
             config = self.controller.build_install_config()
-            role = getattr(config, "node_role", "primary")
-            role_str = role.value if hasattr(role, "value") else str(role)
-
-            device_id = getattr(config, "local_device_id", "") or ""
             saved = {}
             try:
                 from core.config_manager import ConfigManager
 
                 saved = ConfigManager().load()
-                if not device_id:
-                    device_id = saved.get("local_device_id", "")
-                if saved.get("node_role") and not self.controller.get_saved_page_data("sync_settings"):
-                    role_str = saved["node_role"]
             except Exception as e:
                 logger.warning(f"Kayıtlı konfigürasyondan Device ID okunamadı: {e}")
 
-            if not device_id and hasattr(self.controller, "installer_engine"):
-                try:
-                    device_id = self.controller.installer_engine.syncthing_service.get_device_id()
-                except Exception as e:
-                    logger.warning(f"Syncthing servisinden Device ID okunamadı: {e}")
+            role_str = self._get_role_string(config, saved)
+            device_id = self._get_device_id(config, saved)
 
-            token = saved.get("cloudflare_token", "") or getattr(config, "cloudflare_token", "")
-            port = saved.get("caddy_port", 0) or getattr(config, "caddy_port", 80)
-            domain = saved.get("public_domain", "") or getattr(config, "public_domain", "")
-            site_root = saved.get("site_root_path", "") or getattr(config, "site_root_path", "")
-
-            # Alt başlıkta aktif klasör ve domain özetini göster
-            summary_parts = [t("finish_success_msg")]
-            if site_root:
-                summary_parts.append(f"Klasör: {site_root}")
-            if domain:
-                summary_parts.append(f"Domain: {domain}")
-            self.header_subtitle.config(text="   |   ".join(summary_parts))
-
-            if device_id and token and role_str == "primary":
-                try:
-                    from core.models import InstallConfig
-
-                    self.join_key = InstallConfig.generate_join_key(
-                        primary_device_id=device_id,
-                        cloudflare_token=token,
-                        caddy_port=int(port),
-                        public_domain=domain,
-                    )
-                except Exception:
-                    self.join_key = ""
-            else:
-                self.join_key = ""
+            self._update_summary_subtitle(config, saved)
+            self._update_join_key(device_id, role_str, config, saved)
 
             self.set_device_id(device_id)
             self.set_node_role(role_str)
