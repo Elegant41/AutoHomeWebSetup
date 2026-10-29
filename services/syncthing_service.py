@@ -455,18 +455,26 @@ class SyncthingService:
             devices = self.get_devices()
 
             # Cihaz zaten ekli mi?
+            device_exists = False
+            needs_update = False
             for device in devices:
                 if device.get("deviceID") == device_id:
+                    device_exists = True
                     if auto_accept and not device.get("autoAcceptFolders"):
                         device["autoAcceptFolders"] = True
-                        requests.put(
-                            f"{self.api_base}/rest/config/devices",
-                            headers=self._headers,
-                            json=devices,
-                            timeout=10,
-                        ).raise_for_status()
+                        needs_update = True
                     logger.info(f"Cihaz zaten ekli: {device_id[:12]}...")
-                    return
+                    break
+
+            if device_exists:
+                if needs_update:
+                    requests.put(
+                        f"{self.api_base}/rest/config/devices",
+                        headers=self._headers,
+                        json=devices,
+                        timeout=10,
+                    ).raise_for_status()
+                return
 
             # Yeni cihaz oluştur
             new_device = {
