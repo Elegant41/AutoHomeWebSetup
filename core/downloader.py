@@ -7,7 +7,6 @@ yüzdesi ve exponential backoff retry destekler.
 """
 
 import hashlib
-import io
 import threading
 import time
 import zipfile
