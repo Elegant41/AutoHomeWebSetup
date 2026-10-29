@@ -270,7 +270,7 @@ class SettingsDialog(tk.Toplevel):
         y = (self.winfo_screenheight() - 580) // 2
         self.geometry(f"+{x}+{y}")
 
-    def _validate(self) -> bool:
+    def _validate_folder(self) -> bool:
         role = self.current_settings.get("node_role", "primary")
 
         folder_path = self.folder_var.get().strip()
@@ -294,12 +294,18 @@ class SettingsDialog(tk.Toplevel):
                 messagebox.showerror(t("settings_error_title"), t("err_no_index", index_path=index_path), parent=self)
                 return False
 
+        return True
+
+    def _validate_token(self) -> bool:
         token = constants.clean_cloudflare_token(self.token_var.get().strip())
         self.token_var.set(token)
         if not token or not re.match(constants.CLOUDFLARE_TOKEN_REGEX, token):
             messagebox.showerror(t("settings_error_title"), t("err_invalid_token"), parent=self)
             return False
 
+        return True
+
+    def _validate_port(self) -> bool:
         try:
             port = int(self.port_var.get() or "0")
             if not (1 <= port <= 65535):
@@ -313,6 +319,9 @@ class SettingsDialog(tk.Toplevel):
             return False
 
         return True
+
+    def _validate(self) -> bool:
+        return self._validate_folder() and self._validate_token() and self._validate_port()
 
     def _on_save(self) -> None:
         if self._is_busy or not self._validate():
