@@ -136,83 +136,15 @@ class InstallerEngine:
             config: Kurulum yapılandırması
         """
         try:
-            # Uygulama dizinlerini oluştur
-            create_app_directories()
-            self._emit(t("step_dirs"), 5)
+            self._prepare_directories(config)
 
-            # Yedek düğümde site_root_path boşsa varsayılan SITE_DIR kullan
-            if not config.site_root_path:
-                config.site_root_path = str(constants.SITE_DIR)
-            Path(config.site_root_path).mkdir(parents=True, exist_ok=True)
-
-            # 1. NSSM'yi hazırla (Tüm servisler NSSM kullanır, en başta kurulmalıdır)
-            if self._handle_cancel_if_requested():
+            if not self._install_services(config):
                 return
 
-            self._emit(t("step_nssm"), 7)
-            self.downloader.setup_nssm()
-
-            # 2. Caddy kurulumu
-            if self._handle_cancel_if_requested():
+            if not self._configure_nodes(config):
                 return
 
-            self._emit(t("step_caddy"), 10)
-            self.caddy_service.install(
-                site_root=config.site_root_path,
-                port=config.caddy_port,
-                progress_callback=self._caddy_progress_callback,
-            )
-            self._completed_steps.append("caddy")
-
-            # 3. Cloudflared kurulumu
-            if self._handle_cancel_if_requested():
-                return
-
-            self._emit(t("step_cf"), 35)
-            self.cloudflare_service.install(
-                token=config.cloudflare_token,
-                progress_callback=self._cloudflared_progress_callback,
-            )
-            self._completed_steps.append("cloudflared")
-
-            # 4. Syncthing kurulumu
-            if self._handle_cancel_if_requested():
-                return
-
-            self._emit(t("step_sync"), 60)
-            self.syncthing_service.install_as_service(
-                progress_callback=self._syncthing_progress_callback,
-                default_folder_path=config.site_root_path,
-            )
-            self._completed_steps.append("syncthing")
-
-            # 5. Syncthing Device ID al
-            if self._handle_cancel_if_requested():
-                return
-
-            self._emit(t("step_device_id"), 85)
-            device_id = self.syncthing_service.get_device_id()
-            config.local_device_id = device_id
-            config.syncthing_api_key = self.syncthing_service.api_key
-            config.syncthing_gui_port = self.syncthing_service.gui_port
-
-            # 6. Yedek (secondary) ise cihaz eşleştirme, Merkez ise klasör paylaşımı
-            if config.node_role == NodeRole.SECONDARY:
-                self._setup_secondary_node(config)
-            else:
-                self._setup_primary_node(config)
-
-            # 7. Güç / Uyku modu optimizasyonu (opsiyonel)
-            if getattr(config, "prevent_sleep", True):
-                disable_sleep_on_ac()
-
-            # 8. Konfigürasyonu kaydet
-            self._save_install_config(config)
-
-            # 9. Tamamla
-            self._emit_complete()
-            self._is_running = False
-            logger.info("Kurulum başarıyla tamamlandı")
+            self._finalize_installation(config)
 
         except DownloadCancelledError:
             logger.info("Kurulum indirme sırasında kullanıcı tarafından iptal edildi")
@@ -228,6 +160,72 @@ class InstallerEngine:
 
         finally:
             self._is_running = False
+
+    def _prepare_directories(self, config: InstallConfig) -> None:
+        """Uygulama ve site dizinlerini oluşturur."""
+        create_app_directories()
+        self._emit(t("step_dirs"), 5)
+
+        if not config.site_root_path:
+            config.site_root_path = str(constants.SITE_DIR)
+        Path(config.site_root_path).mkdir(parents=True, exist_ok=True)
+
+    def _install_services(self, config: InstallConfig) -> bool:
+        """NSSM ve gerekli servisleri kurar. İptal edildiyse False döner."""
+        steps = [
+            (t("step_nssm"), 7, self.downloader.setup_nssm, None),
+            (t("step_caddy"), 10, lambda: self.caddy_service.install(
+                site_root=config.site_root_path,
+                port=config.caddy_port,
+                progress_callback=self._caddy_progress_callback,
+            ), "caddy"),
+            (t("step_cf"), 35, lambda: self.cloudflare_service.install(
+                token=config.cloudflare_token,
+                progress_callback=self._cloudflared_progress_callback,
+            ), "cloudflared"),
+            (t("step_sync"), 60, lambda: self.syncthing_service.install_as_service(
+                progress_callback=self._syncthing_progress_callback,
+                default_folder_path=config.site_root_path,
+            ), "syncthing"),
+        ]
+
+        for message, progress, action, step_name in steps:
+            if self._handle_cancel_if_requested():
+                return False
+            self._emit(message, progress)
+            action()
+            if step_name:
+                self._completed_steps.append(step_name)
+
+        return True
+
+    def _configure_nodes(self, config: InstallConfig) -> bool:
+        """Syncthing ayarlarını ve cihaz rollerini yapılandırır. İptal edildiyse False döner."""
+        if self._handle_cancel_if_requested():
+            return False
+
+        self._emit(t("step_device_id"), 85)
+        config.local_device_id = self.syncthing_service.get_device_id()
+        config.syncthing_api_key = self.syncthing_service.api_key
+        config.syncthing_gui_port = self.syncthing_service.gui_port
+
+        if config.node_role == NodeRole.SECONDARY:
+            self._setup_secondary_node(config)
+        else:
+            self._setup_primary_node(config)
+
+        return True
+
+    def _finalize_installation(self, config: InstallConfig) -> None:
+        """Kurulumu tamamlar ve ayarları kaydeder."""
+        if getattr(config, "prevent_sleep", True):
+            disable_sleep_on_ac()
+
+        self._save_install_config(config)
+
+        self._emit_complete()
+        self._is_running = False
+        logger.info("Kurulum başarıyla tamamlandı")
 
     # ─── Node Kurulumları ───────────────────────────────────────────
     def _setup_primary_node(self, config: InstallConfig) -> None:
