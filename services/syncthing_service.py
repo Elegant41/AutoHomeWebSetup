@@ -17,7 +17,11 @@ from services.windows_service import NSSMService, ServiceError
 from utils import constants
 from utils.logger import get_logger
 from utils.network import find_available_port, is_port_available
-from utils.platform_utils import add_firewall_rule, is_valid_binary, remove_firewall_rule
+from utils.platform_utils import (
+    add_firewall_rule,
+    is_valid_binary,
+    remove_firewall_rule,
+)
 
 logger = get_logger(__name__)
 
@@ -52,7 +56,9 @@ class SyncthingService:
             self.sync_credentials_from_config()
 
     # ─── Yardımcı Metotlar ──────────────────────────────────────────
-    def _generate_api_key(self, length: int = constants.SYNCTHING_API_KEY_LENGTH) -> str:
+    def _generate_api_key(
+        self, length: int = constants.SYNCTHING_API_KEY_LENGTH
+    ) -> str:
         """Rastgele bir API anahtarı üretir."""
         return "".join(
             random.SystemRandom().choice(constants.SYNCTHING_API_KEY_CHARS)
@@ -74,6 +80,7 @@ class SyncthingService:
         try:
             content = config_path.read_text(encoding="utf-8")
             import re
+
             match = re.search(r"<apikey>([^<]+)</apikey>", content)
             if match:
                 return match.group(1).strip()
@@ -91,7 +98,10 @@ class SyncthingService:
         try:
             content = config_path.read_text(encoding="utf-8")
             import re
-            match = re.search(r"<gui\b[^>]*>.*?<address>[^:<]+:(\d+)</address>", content, re.DOTALL)
+
+            match = re.search(
+                r"<gui\b[^>]*>.*?<address>[^:<]+:(\d+)</address>", content, re.DOTALL
+            )
             if match:
                 return int(match.group(1))
         except Exception:
@@ -151,12 +161,16 @@ class SyncthingService:
                 gui_port = alt_port
                 self.gui_port = gui_port
                 self.api_base = f"http://127.0.0.1:{self.gui_port}"
-                logger.info(f"Syncthing portu çakışması, alternatif port kullanılıyor: {gui_port}")
+                logger.info(
+                    f"Syncthing portu çakışması, alternatif port kullanılıyor: {gui_port}"
+                )
         else:
             self.gui_port = gui_port
             self.api_base = f"http://127.0.0.1:{self.gui_port}"
 
-        default_dir = Path(default_folder_path) if default_folder_path else constants.SITE_DIR
+        default_dir = (
+            Path(default_folder_path) if default_folder_path else constants.SITE_DIR
+        )
         default_dir_clean = str(default_dir.resolve()).replace("\\", "/")
 
         # Eğer geçerli bir config.xml zaten varsa, cihaz ve klasörleri koruyarak güncelle
@@ -196,10 +210,14 @@ class SyncthingService:
                             def_folder.set("path", default_dir_clean)
 
                     tree.write(config_path, encoding="utf-8", xml_declaration=True)
-                    logger.info(f"Mevcut Syncthing yapılandırması korunarak güncellendi: {config_path}")
+                    logger.info(
+                        f"Mevcut Syncthing yapılandırması korunarak güncellendi: {config_path}"
+                    )
                     return config_path
             except Exception as e:
-                logger.warning(f"Mevcut config.xml ayrıştırılamadı, sıfırdan oluşturuluyor: {e}")
+                logger.warning(
+                    f"Mevcut config.xml ayrıştırılamadı, sıfırdan oluşturuluyor: {e}"
+                )
 
         # Modern Syncthing (v2.x - version 52) config.xml şablonu
         config_template = f"""<?xml version="1.0" encoding="utf-8"?>
@@ -244,12 +262,57 @@ class SyncthingService:
 
         try:
             from utils.platform_utils import run_command
+
             run_command(["taskkill", "/F", "/IM", "syncthing.exe"])
             time.sleep(0.3)
         except Exception:
             pass
 
     # ─── Servis Kurulumu ────────────────────────────────────────────
+    def _prepare_binary(self, progress_callback=None) -> Path:
+        """Syncthing binary'sini hazırlar ve güvenlik duvarı iznini ekler."""
+        if progress_callback:
+            progress_callback(10, "Syncthing indiriliyor...")
+
+        syncthing_exe = self.bin_dir / constants.SYNCTHING_EXE
+        if not is_valid_binary(syncthing_exe):
+            syncthing_exe = self.downloader.download_syncthing(progress_callback)
+        else:
+            logger.info(f"Syncthing zaten mevcut: {syncthing_exe}")
+            if progress_callback:
+                progress_callback(100, "Syncthing zaten mevcut")
+
+        # Güvenlik duvarı izni ekle
+        add_firewall_rule(constants.FIREWALL_RULE_SYNCTHING, str(syncthing_exe))
+        return syncthing_exe
+
+    def _setup_nssm_service(self, syncthing_exe: Path, progress_callback=None) -> None:
+        """NSSM kullanarak Syncthing'i Windows servisi olarak kurar ve başlatır."""
+        if progress_callback:
+            progress_callback(60, "Syncthing servisi kaydediliyor...")
+
+        home_dir_clean = str(Path(self.home_dir).resolve()).replace("\\", "/")
+        arguments = (
+            f"--no-browser --no-restart "
+            f'--home="{home_dir_clean}" '
+            f"--gui-address=127.0.0.1:{self.gui_port}"
+        )
+
+        self.nssm.install(
+            name=constants.SERVICE_SYNCTHING,
+            exe_path=str(syncthing_exe),
+            arguments=arguments,
+            display_name="AHWS Syncthing",
+            description="Syncthing dosya senkronizasyonu (AHWS tarafından yönetilir)",
+            app_directory=str(self.bin_dir),
+        )
+
+        # 4. Servisi başlat
+        if progress_callback:
+            progress_callback(80, "Syncthing servisi başlatılıyor...")
+
+        self.nssm.start(constants.SERVICE_SYNCTHING)
+
     def install_as_service(
         self,
         progress_callback=None,
@@ -269,66 +332,30 @@ class SyncthingService:
             ServiceError: Kurulum başarısız olursa
         """
         try:
-            # Önceki kalan syncthing servis veya süreçlerini temizle
             self.cleanup_existing_syncthing()
 
-            # 1. Syncthing binary'sini indir
-            if progress_callback:
-                progress_callback(10, "Syncthing indiriliyor...")
-
-            syncthing_exe = self.bin_dir / constants.SYNCTHING_EXE
-            if not is_valid_binary(syncthing_exe):
-                syncthing_exe = self.downloader.download_syncthing(progress_callback)
-            else:
-                logger.info(f"Syncthing zaten mevcut: {syncthing_exe}")
-                if progress_callback:
-                    progress_callback(100, "Syncthing zaten mevcut")
-
-            # Güvenlik duvarı izni ekle
-            add_firewall_rule(constants.FIREWALL_RULE_SYNCTHING, str(syncthing_exe))
+            # 1. Binary hazırlık (indirme ve güvenlik duvarı)
+            syncthing_exe = self._prepare_binary(progress_callback)
 
             # 2. İlk yapılandırmayı oluştur
             if progress_callback:
                 progress_callback(30, "Syncthing yapılandırması oluşturuluyor...")
-
             self.generate_initial_config(default_folder_path=default_folder_path)
 
-            # 3. NSSM servisi olarak kur
-            if progress_callback:
-                progress_callback(60, "Syncthing servisi kaydediliyor...")
+            # 3. NSSM servisini kur ve başlat
+            self._setup_nssm_service(syncthing_exe, progress_callback)
 
-            home_dir_clean = str(Path(self.home_dir).resolve()).replace("\\", "/")
-            arguments = (
-                f"--no-browser --no-restart "
-                f'--home="{home_dir_clean}" '
-                f"--gui-address=127.0.0.1:{self.gui_port}"
-            )
-
-            self.nssm.install(
-                name=constants.SERVICE_SYNCTHING,
-                exe_path=str(syncthing_exe),
-                arguments=arguments,
-                display_name="AHWS Syncthing",
-                description="Syncthing dosya senkronizasyonu (AHWS tarafından yönetilir)",
-                app_directory=str(self.bin_dir),
-            )
-
-            # 4. Servisi başlat
-            if progress_callback:
-                progress_callback(80, "Syncthing servisi başlatılıyor...")
-
-            self.nssm.start(constants.SERVICE_SYNCTHING)
-
-            # 5. API'nin hazır olmasını bekle
+            # 4. API'nin hazır olmasını bekle
             if progress_callback:
                 progress_callback(90, "Syncthing API'si bekleniyor...")
-
             self.wait_for_api(timeout=constants.SYNCTHING_API_TIMEOUT)
 
             if progress_callback:
                 progress_callback(100, "Syncthing kurulumu tamamlandı")
 
-            logger.info(f"Syncthing servisi kuruldu ve başlatıldı (port: {self.gui_port})")
+            logger.info(
+                f"Syncthing servisi kuruldu ve başlatıldı (port: {self.gui_port})"
+            )
             return syncthing_exe
 
         except Exception as e:
@@ -497,7 +524,9 @@ class SyncthingService:
                 timeout=10,
             )
             response.raise_for_status()
-            logger.info(f"Syncthing cihaz eklendi: {device_id[:12]}... ({name or 'İsimsiz'})")
+            logger.info(
+                f"Syncthing cihaz eklendi: {device_id[:12]}... ({name or 'İsimsiz'})"
+            )
 
         except requests.RequestException as e:
             raise ServiceError(f"Syncthing cihaz eklenemedi: {e}") from e
@@ -590,10 +619,14 @@ class SyncthingService:
                 # HATA-05: Mevcut klasöre cihazları dict formatında ekle ve yolu güncelle
                 if folder_path:
                     existing["path"] = folder_path
-                existing_device_ids = {d["deviceID"] for d in existing.get("devices", [])}
+                existing_device_ids = {
+                    d["deviceID"] for d in existing.get("devices", [])
+                }
                 for dev_id in device_ids:
                     if dev_id not in existing_device_ids:
-                        existing["devices"].append({"deviceID": dev_id, "encryptionPassword": ""})
+                        existing["devices"].append(
+                            {"deviceID": dev_id, "encryptionPassword": ""}
+                        )
 
                 response = requests.put(
                     f"{self.api_base}/rest/config/folders/{folder_id}",
@@ -611,7 +644,9 @@ class SyncthingService:
                 "label": label or folder_id,
                 "path": folder_path,
                 "type": "sendreceive",
-                "devices": [{"deviceID": did, "encryptionPassword": ""} for did in device_ids],
+                "devices": [
+                    {"deviceID": did, "encryptionPassword": ""} for did in device_ids
+                ],
                 "rescanIntervalS": 60,
                 "fsWatcherEnabled": True,
                 "fsWatcherDelayS": 10,
@@ -680,10 +715,17 @@ class SyncthingService:
                         timeout=10,
                     )
                     response.raise_for_status()
-                    logger.info(f"Syncthing klasör yolu güncellendi: {folder_id} → {new_path}")
+                    logger.info(
+                        f"Syncthing klasör yolu güncellendi: {folder_id} → {new_path}"
+                    )
                     return
             # Klasör henüz yoksa oluştur
-            self.share_folder(folder_id=folder_id, folder_path=new_path, device_ids=[], label="AHWS Web Site")
+            self.share_folder(
+                folder_id=folder_id,
+                folder_path=new_path,
+                device_ids=[],
+                label="AHWS Web Site",
+            )
         except Exception as e:
             logger.warning(f"Syncthing klasör yolu güncellenemedi: {e}")
 
