@@ -6,6 +6,7 @@ Port kontrolü, bağlantı testi ve ağ durumu tespiti.
 
 import socket
 import urllib.request
+import ssl
 
 from utils.logger import get_logger
 
@@ -121,7 +122,8 @@ def check_internet_connection(timeout: int = 5) -> bool:
         False: İnternet bağlantısı yok
     """
     try:
-        urllib.request.urlopen("https://www.cloudflare.com", timeout=timeout)
+        context = ssl.create_default_context()
+        urllib.request.urlopen("https://www.cloudflare.com", timeout=timeout, context=context)
         return True
     except Exception:
         return False
