@@ -243,19 +243,22 @@ class InstallerEngine:
         label = "AHWS Web Site"
 
         existing_sec_ids: list[str] = []
+        seen_sec_ids: set[str] = set()
         try:
             prev = self.config_manager.load()
             for did in prev.get("secondary_device_ids", []):
-                if did and did != config.local_device_id and did not in existing_sec_ids:
+                if did and did != config.local_device_id and did not in seen_sec_ids:
                     existing_sec_ids.append(did)
+                    seen_sec_ids.add(did)
         except Exception:
             pass
 
         try:
             for dev in self.syncthing_service.get_devices():
                 did = dev.get("deviceID", "")
-                if did and did != config.local_device_id and did not in existing_sec_ids:
+                if did and did != config.local_device_id and did not in seen_sec_ids:
                     existing_sec_ids.append(did)
+                    seen_sec_ids.add(did)
         except Exception:
             pass
 
