@@ -50,6 +50,53 @@ class CloudflareService:
             return False
         return bool(re.match(constants.CLOUDFLARE_TOKEN_REGEX, token))
 
+    def _download_binary(self, progress_callback=None) -> Path:
+        """Cloudflared binary'sini indirir veya mevcut olanı döndürür."""
+        if progress_callback:
+            progress_callback(10, "Cloudflared indiriliyor...")
+
+        cloudflared_exe = self.bin_dir / constants.CLOUDFLARED_EXE
+        if not is_valid_binary(cloudflared_exe):
+            cloudflared_exe = self.downloader.download_cloudflared(progress_callback)
+        else:
+            logger.info(f"Cloudflared zaten mevcut: {cloudflared_exe}")
+            if progress_callback:
+                progress_callback(100, "Cloudflared zaten mevcut")
+
+        return cloudflared_exe
+
+    def _register_service(self, cloudflared_exe: Path, token: str, progress_callback=None) -> None:
+        """Cloudflared servisini kaydeder."""
+        if self.is_installed():
+            logger.info("Cloudflared servisi zaten kurulu, yeniden kuruluyor...")
+            self.uninstall()
+
+        if progress_callback:
+            progress_callback(50, "Cloudflared servisi kuruluyor...")
+
+        result = run_command(
+            [str(cloudflared_exe), "service", "install", token],
+            timeout=60,
+        )
+
+        if result.returncode != 0:
+            raise ServiceError(
+                f"Cloudflared servis kurulumu başarısız: "
+                f"{result.stderr.strip() or result.stdout.strip()}"
+            )
+
+    def _start_service(self, progress_callback=None) -> None:
+        """Cloudflared servisini başlatır."""
+        if progress_callback:
+            progress_callback(80, "Cloudflared servisi başlatılıyor...")
+
+        SCService.start(constants.SERVICE_CLOUDFLARED)
+
+        if progress_callback:
+            progress_callback(100, "Cloudflared kurulumu tamamlandı")
+
+        logger.info("Cloudflared servisi kuruldu ve başlatıldı")
+
     def install(
         self,
         token: str,
@@ -74,47 +121,14 @@ class CloudflareService:
                 raise ServiceError("Geçersiz Cloudflare Tunnel token formatı.")
 
             # 1. Cloudflared binary'sini indir
-            if progress_callback:
-                progress_callback(10, "Cloudflared indiriliyor...")
+            cloudflared_exe = self._download_binary(progress_callback)
 
-            cloudflared_exe = self.bin_dir / constants.CLOUDFLARED_EXE
-            if not is_valid_binary(cloudflared_exe):
-                cloudflared_exe = self.downloader.download_cloudflared(progress_callback)
-            else:
-                logger.info(f"Cloudflared zaten mevcut: {cloudflared_exe}")
-                if progress_callback:
-                    progress_callback(100, "Cloudflared zaten mevcut")
-
-            # 2. Servis zaten kuruluysa kaldır
-            if self.is_installed():
-                logger.info("Cloudflared servisi zaten kurulu, yeniden kuruluyor...")
-                self.uninstall()
-
-            # 3. Cloudflared servisini kur
-            if progress_callback:
-                progress_callback(50, "Cloudflared servisi kuruluyor...")
-
-            result = run_command(
-                [str(cloudflared_exe), "service", "install", token],
-                timeout=60,
-            )
-
-            if result.returncode != 0:
-                raise ServiceError(
-                    f"Cloudflared servis kurulumu başarısız: "
-                    f"{result.stderr.strip() or result.stdout.strip()}"
-                )
+            # 2 & 3. Servis zaten kuruluysa kaldır ve yenisini kur
+            self._register_service(cloudflared_exe, token, progress_callback)
 
             # 4. Servisi başlat
-            if progress_callback:
-                progress_callback(80, "Cloudflared servisi başlatılıyor...")
+            self._start_service(progress_callback)
 
-            SCService.start(constants.SERVICE_CLOUDFLARED)
-
-            if progress_callback:
-                progress_callback(100, "Cloudflared kurulumu tamamlandı")
-
-            logger.info("Cloudflared servisi kuruldu ve başlatıldı")
             return cloudflared_exe
 
         except Exception as e:
