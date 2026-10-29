@@ -36,6 +36,36 @@ class ConfigManager:
         except Exception as e:
             logger.warning(f"Konfigürasyon taşıma uyarısı: {e}")
 
+    def _is_token_encrypted(self, token_str: str, is_encrypted: bool) -> bool:
+        """Token'ın şifreli olup olmadığını kontrol eder."""
+        if token_str.startswith("eyJ") and not is_encrypted:
+            return False
+        if not is_encrypted and not token_str.startswith("gAAAAAB"):
+            return False
+        return True
+
+    def _get_fernet_key(self, target_path: Path) -> Optional[bytes]:
+        """Olası dosya yollarından Fernet anahtarını bulup döndürür."""
+        possible_keys = [
+            self.config_path.parent / "secret.key",
+            target_path.parent / "secret.key",
+            self.legacy_config_path.parent / "secret.key",
+            Path(r"C:\ProgramData\AHWS\config\secret.key"),
+            Path(r"C:\ProgramData\AutoHomeWebSetup\config\secret.key"),
+        ]
+
+        for kpath in possible_keys:
+            if not kpath.exists():
+                continue
+            try:
+                with open(kpath, "rb") as kf:
+                    content = kf.read().strip()
+                    if content:
+                        return content
+            except Exception as e:
+                logger.debug(f"Anahtar okuma hatası ({kpath}): {e}")
+        return None
+
     def _decrypt_legacy_token(self, data: dict[str, Any], target_path: Path) -> bool:
         """
         Eski AHWS sürümlerinden kalan Fernet ile şifrelenmiş Cloudflare token'ı çözer.
@@ -50,34 +80,10 @@ class ConfigManager:
             return False
 
         token_str = token.strip()
-        # Eğer token zaten eyJ... ile başlıyorsa ve şifreli değilse müdahale etme
-        if token_str.startswith("eyJ") and not is_encrypted:
+        if not self._is_token_encrypted(token_str, is_encrypted):
             return False
 
-        # Fernet şifreli metinler genelde 'gAAAAAB' ile başlar veya _is_encrypted bayrağı vardır
-        if not is_encrypted and not token_str.startswith("gAAAAAB"):
-            return False
-
-        possible_keys = [
-            self.config_path.parent / "secret.key",
-            target_path.parent / "secret.key",
-            self.legacy_config_path.parent / "secret.key",
-            Path(r"C:\ProgramData\AHWS\config\secret.key"),
-            Path(r"C:\ProgramData\AutoHomeWebSetup\config\secret.key"),
-        ]
-
-        fernet_key: Optional[bytes] = None
-        for kpath in possible_keys:
-            if kpath.exists():
-                try:
-                    with open(kpath, "rb") as kf:
-                        content = kf.read().strip()
-                        if content:
-                            fernet_key = content
-                            break
-                except Exception as e:
-                    logger.debug(f"Anahtar okuma hatası ({kpath}): {e}")
-
+        fernet_key = self._get_fernet_key(target_path)
         if not fernet_key:
             logger.warning("Şifreli token tespit edildi ancak secret.key bulunamadı.")
             return False
