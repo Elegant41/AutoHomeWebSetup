@@ -314,6 +314,40 @@ class SettingsDialog(tk.Toplevel):
 
         return True
 
+    def _apply_engine_changes(self, folder_changed: bool, port_changed: bool, token_changed: bool, new_folder: str, new_port: int, new_token: str) -> None:
+        """Applies changes to the installer engine services if needed."""
+        engine = getattr(self.controller, "installer_engine", None)
+        if not engine:
+            return
+
+        if folder_changed or port_changed:
+            engine.caddy_service.generate_caddyfile(new_folder, new_port)
+            engine.caddy_service.restart()
+
+        if folder_changed:
+            engine.syncthing_service.update_folder_path("auto-home-web", new_folder)
+
+        if token_changed:
+            engine.cloudflare_service.install(new_token)
+
+    def _save_worker(self, new_folder: str, new_token: str, new_domain: str, new_port: int, folder_changed: bool, token_changed: bool, domain_changed: bool, port_changed: bool) -> None:
+        """Background thread worker for saving settings."""
+        try:
+            self.current_settings["site_root_path"] = new_folder
+            self.current_settings["cloudflare_token"] = new_token
+            self.current_settings["public_domain"] = new_domain
+            self.current_settings["caddy_port"] = new_port
+            self.config_mgr.save(self.current_settings, include_metadata=False)
+
+            self._apply_engine_changes(folder_changed, port_changed, token_changed, new_folder, new_port, new_token)
+
+            if self.winfo_exists():
+                self.after(0, self._on_save_success)
+        except Exception as e:
+            logger.error(f"Ayarlar kaydedilirken hata: {e}")
+            if self.winfo_exists():
+                self.after(0, lambda err=str(e): self._on_save_error(err))
+
     def _on_save(self) -> None:
         if self._is_busy or not self._validate():
             return
@@ -336,34 +370,11 @@ class SettingsDialog(tk.Toplevel):
         self._set_buttons_state("disabled")
         self.status_label.config(text=t("settings_applying"), fg=theme.INFO_COLOR)
 
-        def _worker():
-            try:
-                self.current_settings["site_root_path"] = new_folder
-                self.current_settings["cloudflare_token"] = new_token
-                self.current_settings["public_domain"] = new_domain
-                self.current_settings["caddy_port"] = new_port
-                self.config_mgr.save(self.current_settings, include_metadata=False)
-
-                engine = getattr(self.controller, "installer_engine", None)
-                if engine:
-                    if folder_changed or port_changed:
-                        engine.caddy_service.generate_caddyfile(new_folder, new_port)
-                        engine.caddy_service.restart()
-
-                    if folder_changed:
-                        engine.syncthing_service.update_folder_path("auto-home-web", new_folder)
-
-                    if token_changed:
-                        engine.cloudflare_service.install(new_token)
-
-                if self.winfo_exists():
-                    self.after(0, self._on_save_success)
-            except Exception as e:
-                logger.error(f"Ayarlar kaydedilirken hata: {e}")
-                if self.winfo_exists():
-                    self.after(0, lambda err=str(e): self._on_save_error(err))
-
-        threading.Thread(target=_worker, daemon=True).start()
+        threading.Thread(
+            target=self._save_worker,
+            args=(new_folder, new_token, new_domain, new_port, folder_changed, token_changed, domain_changed, port_changed),
+            daemon=True
+        ).start()
 
     def _on_save_success(self) -> None:
         self._is_busy = False
@@ -387,6 +398,22 @@ class SettingsDialog(tk.Toplevel):
         self.status_label.config(text=t("settings_save_failed"), fg=theme.ERROR_COLOR)
         messagebox.showerror(t("settings_error_title"), t("settings_error_msg", error=error_msg), parent=self)
 
+    def _uninstall_worker(self) -> None:
+        """Background thread worker for uninstalling services."""
+        try:
+            engine = getattr(self.controller, "installer_engine", None)
+            if engine:
+                engine.uninstall_all()
+            elif hasattr(self, "config_mgr"):
+                self.config_mgr.delete()
+
+            if self.winfo_exists():
+                self.after(0, self._on_uninstall_success)
+        except Exception as e:
+            logger.error(f"Kaldırma işlemi sırasında hata: {e}")
+            if self.winfo_exists():
+                self.after(0, lambda err=str(e): self._on_uninstall_error(err))
+
     def _on_uninstall(self) -> None:
         """Kurulumu tamamen kaldırır (arka plan thread'inde)."""
         if self._is_busy:
@@ -404,22 +431,7 @@ class SettingsDialog(tk.Toplevel):
         self._set_buttons_state("disabled")
         self.status_label.config(text=t("settings_uninstalling"), fg=theme.WARNING_COLOR)
 
-        def _worker():
-            try:
-                engine = getattr(self.controller, "installer_engine", None)
-                if engine:
-                    engine.uninstall_all()
-                elif hasattr(self, "config_mgr"):
-                    self.config_mgr.delete()
-
-                if self.winfo_exists():
-                    self.after(0, self._on_uninstall_success)
-            except Exception as e:
-                logger.error(f"Kaldırma işlemi sırasında hata: {e}")
-                if self.winfo_exists():
-                    self.after(0, lambda err=str(e): self._on_uninstall_error(err))
-
-        threading.Thread(target=_worker, daemon=True).start()
+        threading.Thread(target=self._uninstall_worker, daemon=True).start()
 
     def _on_uninstall_success(self) -> None:
         self._is_busy = False
