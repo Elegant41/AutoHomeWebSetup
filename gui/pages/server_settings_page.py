@@ -408,15 +408,7 @@ class ServerSettingsPage(BasePage):
         self._on_folder_change()
         self._update_port_status()
 
-    def validate(self) -> tuple[bool, str]:
-        """Sayfa geçiş validasyonu."""
-        role = self._get_current_role()
-        folder_path = self.folder_var.get().strip()
-
-        if role == "secondary" and not folder_path:
-            folder_path = str(constants.SITE_DIR)
-            self.folder_var.set(folder_path)
-
+    def _validate_folder(self, role: str, folder_path: str) -> tuple[bool, str]:
         if not folder_path:
             return False, t("err_no_folder")
 
@@ -434,14 +426,18 @@ class ServerSettingsPage(BasePage):
             index_path = Path(folder_path) / "index.html"
             if not index_path.is_file():
                 return False, t("err_no_index", index_path=index_path)
+        return True, ""
 
+    def _validate_token(self) -> tuple[bool, str]:
         token = constants.clean_cloudflare_token(self.token_var.get().strip())
         self.token_var.set(token)
         if not token:
             return False, t("err_no_token")
         if not re.match(constants.CLOUDFLARE_TOKEN_REGEX, token):
             return False, t("err_invalid_token")
+        return True, ""
 
+    def _validate_port(self) -> tuple[bool, str]:
         try:
             port = int(self.port_var.get() or "0")
             if not (1 <= port <= 65535):
@@ -450,6 +446,28 @@ class ServerSettingsPage(BasePage):
                 return False, t("err_port_in_use_msg", port=port)
         except ValueError:
             return False, t("server_port_invalid")
+        return True, ""
+
+    def validate(self) -> tuple[bool, str]:
+        """Sayfa geçiş validasyonu."""
+        role = self._get_current_role()
+        folder_path = self.folder_var.get().strip()
+
+        if role == "secondary" and not folder_path:
+            folder_path = str(constants.SITE_DIR)
+            self.folder_var.set(folder_path)
+
+        is_valid, error_msg = self._validate_folder(role, folder_path)
+        if not is_valid:
+            return is_valid, error_msg
+
+        is_valid, error_msg = self._validate_token()
+        if not is_valid:
+            return is_valid, error_msg
+
+        is_valid, error_msg = self._validate_port()
+        if not is_valid:
+            return is_valid, error_msg
 
         return True, ""
 
