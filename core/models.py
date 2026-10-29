@@ -61,24 +61,29 @@ class InstallConfig:
             "local_device_id": self.local_device_id,
         }
 
+    @staticmethod
+    def _process_cloudflare_token(token: str) -> str:
+        """Cloudflare token'ını temizler ve gerekiyorsa eski şifrelemeyi çözer."""
+        if not token or not isinstance(token, str):
+            return token
+        token = constants.clean_cloudflare_token(token.strip())
+        if token.startswith("gAAAAAB"):
+            try:
+                from core.config_manager import ConfigManager
+                cfg = ConfigManager()
+                dummy = {"cloudflare_token": token, "_is_encrypted": True}
+                if cfg._decrypt_legacy_token(dummy, cfg.config_path):
+                    return dummy.get("cloudflare_token", token)
+            except Exception:
+                pass
+        return token
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "InstallConfig":
         """Sözlükten InstallConfig oluşturur."""
         config = cls()
         config.site_root_path = data.get("site_root_path", "")
-        token = data.get("cloudflare_token", "")
-        if token and isinstance(token, str):
-            token = constants.clean_cloudflare_token(token)
-            if token.startswith("gAAAAAB"):
-                try:
-                    from core.config_manager import ConfigManager
-                    cfg = ConfigManager()
-                    dummy = {"cloudflare_token": token, "_is_encrypted": True}
-                    if cfg._decrypt_legacy_token(dummy, cfg.config_path):
-                        token = dummy.get("cloudflare_token", token)
-                except Exception:
-                    pass
-        config.cloudflare_token = token
+        config.cloudflare_token = cls._process_cloudflare_token(data.get("cloudflare_token", ""))
         config.public_domain = data.get("public_domain", "")
         config.prevent_sleep = data.get("prevent_sleep", True)
         role = data.get("node_role", "primary")
@@ -104,16 +109,7 @@ class InstallConfig:
         if not cloudflare_token or not primary_device_id:
             return ""
 
-        token_to_use = constants.clean_cloudflare_token(cloudflare_token.strip())
-        if token_to_use.startswith("gAAAAAB"):
-            try:
-                from core.config_manager import ConfigManager
-                cfg = ConfigManager()
-                dummy = {"cloudflare_token": token_to_use, "_is_encrypted": True}
-                if cfg._decrypt_legacy_token(dummy, cfg.config_path):
-                    token_to_use = dummy.get("cloudflare_token", token_to_use)
-            except Exception:
-                pass
+        token_to_use = InstallConfig._process_cloudflare_token(cloudflare_token)
 
         payload = {
             "t": token_to_use,
@@ -149,21 +145,17 @@ class InstallConfig:
             payload = json.loads(raw_bytes.decode("utf-8"))
             if not isinstance(payload, dict):
                 return None
-            token = constants.clean_cloudflare_token(str(payload.get("t", "")).strip())
-            if token.startswith("gAAAAAB"):
-                try:
-                    from core.config_manager import ConfigManager
-                    cfg = ConfigManager()
-                    dummy = {"cloudflare_token": token, "_is_encrypted": True}
-                    if cfg._decrypt_legacy_token(dummy, cfg.config_path):
-                        token = dummy.get("cloudflare_token", token)
-                except Exception:
-                    pass
+
+            raw_token = str(payload.get("t", "")).strip()
+            token = InstallConfig._process_cloudflare_token(raw_token)
+
             device_id = str(payload.get("d", "")).strip()
             port = int(payload.get("p", constants.CADDY_DEFAULT_PORT))
             domain = str(payload.get("u", "")).strip()
+
             if not token or not device_id:
                 return None
+
             return {
                 "cloudflare_token": token,
                 "primary_device_id": device_id,
