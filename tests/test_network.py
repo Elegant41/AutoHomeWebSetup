@@ -14,6 +14,7 @@ from utils.network import (
     check_internet_connection,
     check_tcp_connection,
     find_available_port,
+    is_port_in_use_by_caddy,
 )
 
 
@@ -88,6 +89,62 @@ class TestCheckTCPConnection(unittest.TestCase):
         result = check_tcp_connection("127.0.0.1", 8080)
         self.assertTrue(result)
 
+
+class TestIsPortInUseByCaddy(unittest.TestCase):
+
+    @patch("utils.constants.CADDYFILE_PATH")
+    @patch("services.windows_service.SCService.is_running")
+    @patch("utils.constants.SERVICE_CADDY", "AHWS-Caddy")
+    @patch("utils.platform_utils.run_command")
+    def test_in_use_by_caddyfile_and_service_running(self, mock_run_command, mock_is_running, mock_caddyfile_path):
+        """Caddyfile portu iceriyor ve servis calisiyorsa True."""
+        mock_caddyfile_path.exists.return_value = True
+        mock_caddyfile_path.read_text.return_value = "localhost:80 {\n}"
+        mock_is_running.return_value = True
+
+        self.assertTrue(is_port_in_use_by_caddy(80))
+
+    @patch("utils.constants.CADDYFILE_PATH")
+    @patch("services.windows_service.SCService.is_running")
+    @patch("utils.constants.SERVICE_CADDY", "AHWS-Caddy")
+    @patch("utils.platform_utils.run_command")
+    def test_in_use_by_caddyfile_but_service_not_running(self, mock_run_command, mock_is_running, mock_caddyfile_path):
+        """Caddyfile iceriyor ama servis calismiyor ve process yoksa False."""
+        mock_caddyfile_path.exists.return_value = True
+        mock_caddyfile_path.read_text.return_value = "localhost:80 {\n}"
+        mock_is_running.return_value = False
+
+        mock_run_command.return_value = MagicMock(stdout="")
+
+        self.assertFalse(is_port_in_use_by_caddy(80))
+
+    @patch("utils.constants.CADDYFILE_PATH")
+    @patch("utils.platform_utils.run_command")
+    def test_not_in_caddyfile_but_in_powershell(self, mock_run_command, mock_caddyfile_path):
+        """Caddyfile'da yok ama PowerShell process caddy diyorsa True."""
+        mock_caddyfile_path.exists.return_value = False
+
+        mock_run_command.return_value = MagicMock(stdout="caddy\r\n")
+
+        self.assertTrue(is_port_in_use_by_caddy(8080))
+
+    @patch("utils.constants.CADDYFILE_PATH")
+    @patch("utils.platform_utils.run_command")
+    def test_not_in_use(self, mock_run_command, mock_caddyfile_path):
+        """Caddyfile'da yok ve baska bir program (caddy disinda) dinliyorsa False."""
+        mock_caddyfile_path.exists.return_value = False
+
+        mock_run_command.return_value = MagicMock(stdout="System\r\n")
+
+        self.assertFalse(is_port_in_use_by_caddy(80))
+
+    @patch("utils.constants.CADDYFILE_PATH")
+    @patch("utils.platform_utils.run_command")
+    def test_exception_handling(self, mock_run_command, mock_caddyfile_path):
+        """Bir exception durumunda kod cokmemeli, False donmeli."""
+        mock_caddyfile_path.exists.side_effect = Exception("File system error")
+
+        self.assertFalse(is_port_in_use_by_caddy(80))
 
 if __name__ == "__main__":
     unittest.main()
