@@ -366,15 +366,15 @@ class ServerSettingsPage(BasePage):
         except ValueError:
             self.port_status_label.config(text=t("server_port_invalid"), fg=theme.ERROR_COLOR)
 
-    # ─── BasePage Override'ları ─────────────────────────────────────
-    def on_enter(self) -> None:
-        """Sayfaya girildiğinde verileri ve rol bazlı açıklamaları güncelle."""
-        role = self._get_current_role()
+    def _update_role_descriptions(self, role: str) -> None:
+        """Rol bazlı klasör açıklamasını günceller."""
         if role == "secondary":
             self.folder_desc.config(text=t("server_folder_secondary_desc"))
         else:
             self.folder_desc.config(text=t("server_folder_desc"))
 
+    def _load_saved_data(self) -> dict:
+        """Kaydedilmiş sayfa verilerini veya yapılandırmayı yükler."""
         saved = {}
         if self.controller:
             saved = self.controller.get_saved_page_data(self.PAGE_NAME) or {}
@@ -389,6 +389,10 @@ class ServerSettingsPage(BasePage):
             except Exception:
                 pass
 
+        return saved
+
+    def _apply_saved_data(self, saved: dict) -> None:
+        """Kaydedilmiş verileri UI değişkenlerine uygular."""
         if saved:
             if saved.get("site_root_path"):
                 self.folder_var.set(saved["site_root_path"])
@@ -401,6 +405,15 @@ class ServerSettingsPage(BasePage):
                 self.port_var.set(str(saved["caddy_port"]))
             if "prevent_sleep" in saved:
                 self.prevent_sleep_var.set(bool(saved["prevent_sleep"]))
+
+    # ─── BasePage Override'ları ─────────────────────────────────────
+    def on_enter(self) -> None:
+        """Sayfaya girildiğinde verileri ve rol bazlı açıklamaları güncelle."""
+        role = self._get_current_role()
+        self._update_role_descriptions(role)
+
+        saved = self._load_saved_data()
+        self._apply_saved_data(saved)
 
         if role == "secondary" and not self.folder_var.get().strip():
             self.folder_var.set(str(constants.SITE_DIR))
