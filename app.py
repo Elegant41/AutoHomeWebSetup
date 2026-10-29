@@ -229,15 +229,8 @@ class App(tk.Tk):
                 return name
         return None
 
-    def change_language(self, lang_code: str) -> None:
-        """Uygulama dilini değiştirir ve arayüzü yeniden yükler (form verilerini ve geçmişi korur)."""
-        if self.installer_engine.is_running():
-            return
-
-        from utils.i18n import set_language
-        set_language(lang_code)
-
-        # Mevcut sayfanın anlık verilerini kaydet ve sayfa geçmişini hatırla
+    def _save_current_state(self) -> list[str]:
+        """Mevcut sayfanın verilerini kaydeder ve sayfa geçmişini döndürür."""
         stack_names: list[str] = []
         if self._page_stack:
             current = self._page_stack[-1]
@@ -251,8 +244,10 @@ class App(tk.Tk):
                 pname = self._find_page_name(p)
                 if pname:
                     stack_names.append(pname)
+        return stack_names
 
-        # Mevcut sayfaları ve üst çubuğu temizle
+    def _rebuild_ui(self) -> None:
+        """Arayüzü (üst çubuk, sayfalar) temizler ve yeniden oluşturur."""
         if hasattr(self, "_step_bar") and self._step_bar:
             self._step_bar.destroy()
         from gui.widgets import WizardStepBar
@@ -273,22 +268,39 @@ class App(tk.Tk):
         if hasattr(install_page, "set_engine"):
             install_page.set_engine(self.installer_engine)
 
-        # Sayfa yığınını (back history) koruyarak kaldığımız sayfaya git
-        if stack_names:
-            for p in list(self._page_stack):
-                try:
-                    p.pack_forget()
-                    if hasattr(p, "on_leave"):
-                        p.on_leave()
-                except Exception:
-                    pass
-            self._page_stack.clear()
-            for pname in stack_names[:-1]:
-                if pname in self._pages:
-                    self._page_stack.append(self._pages[pname])
-            target_name = stack_names[-1]
-            if target_name in self._pages:
-                self.show_page(target_name)
+    def _restore_history(self, stack_names: list[str]) -> None:
+        """Sayfa yığınını (back history) koruyarak kalınan sayfaya geri döner."""
+        if not stack_names:
+            return
+
+        for p in list(self._page_stack):
+            try:
+                p.pack_forget()
+                if hasattr(p, "on_leave"):
+                    p.on_leave()
+            except Exception:
+                pass
+        self._page_stack.clear()
+
+        for pname in stack_names[:-1]:
+            if pname in self._pages:
+                self._page_stack.append(self._pages[pname])
+
+        target_name = stack_names[-1]
+        if target_name in self._pages:
+            self.show_page(target_name)
+
+    def change_language(self, lang_code: str) -> None:
+        """Uygulama dilini değiştirir ve arayüzü yeniden yükler (form verilerini ve geçmişi korur)."""
+        if self.installer_engine.is_running():
+            return
+
+        from utils.i18n import set_language
+        set_language(lang_code)
+
+        stack_names = self._save_current_state()
+        self._rebuild_ui()
+        self._restore_history(stack_names)
 
     # ─── Veri Yönetimi ──────────────────────────────────────────────
     def collect_page_data(self, page_name: str, data: dict) -> None:
