@@ -14,6 +14,7 @@ from utils.network import (
     check_internet_connection,
     check_tcp_connection,
     find_available_port,
+    check_local_http_health,
 )
 
 
@@ -87,6 +88,57 @@ class TestCheckTCPConnection(unittest.TestCase):
         mock_conn.return_value.__exit__ = MagicMock(return_value=False)
         result = check_tcp_connection("127.0.0.1", 8080)
         self.assertTrue(result)
+
+
+
+class TestCheckLocalHttpHealth(unittest.TestCase):
+
+    @patch("utils.network.urllib.request.urlopen")
+    def test_health_success_first_path(self, mock_urlopen):
+        """/ahws-health yolunda basarili yanit (200) True dondurmeli."""
+        mock_resp = MagicMock()
+        mock_resp.status = 200
+        mock_urlopen.return_value.__enter__.return_value = mock_resp
+
+        result = check_local_http_health()
+        self.assertTrue(result)
+        mock_urlopen.assert_called_once()
+        self.assertIn("/ahws-health", mock_urlopen.call_args[0][0])
+
+    @patch("utils.network.urllib.request.urlopen")
+    def test_health_success_second_path(self, mock_urlopen):
+        """Ilk yolda hata olup, ikinci yolda (/) basarili yanit True dondurmeli."""
+        mock_resp_success = MagicMock()
+        mock_resp_success.status = 200
+
+        mock_urlopen.side_effect = [
+            Exception("Connection refused"),
+            MagicMock(__enter__=MagicMock(return_value=mock_resp_success))
+        ]
+
+        result = check_local_http_health()
+        self.assertTrue(result)
+        self.assertEqual(mock_urlopen.call_count, 2)
+
+    @patch("utils.network.urllib.request.urlopen")
+    def test_health_fail_http_error(self, mock_urlopen):
+        """HTTP Hata durumlari (400, 500) False dondurmeli."""
+        mock_resp = MagicMock()
+        mock_resp.status = 404
+        mock_urlopen.return_value.__enter__.return_value = mock_resp
+
+        result = check_local_http_health()
+        self.assertFalse(result)
+        self.assertEqual(mock_urlopen.call_count, 2)
+
+    @patch("utils.network.urllib.request.urlopen")
+    def test_health_fail_exceptions(self, mock_urlopen):
+        """Tüm yollarda Exception (örn. Timeout) False dondurmeli."""
+        mock_urlopen.side_effect = Exception("Timeout")
+
+        result = check_local_http_health()
+        self.assertFalse(result)
+        self.assertEqual(mock_urlopen.call_count, 2)
 
 
 if __name__ == "__main__":
