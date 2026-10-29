@@ -526,17 +526,10 @@ class InstallerEngine:
         }
 
     # ─── Node Yönetimi (GUI'den çağrılır) ───────────────────────────
-    def add_secondary_node(self, device_id: str, name: str = "") -> None:
+    def _update_syncthing_credentials(self, config_data: dict) -> None:
         """
-        Mevcut kuruluma yeni bir yedek düğüm ekler.
-
-        Merkez bilgisayardan, kurulum tamamlandıktan sonra çağrılır.
-
-        Args:
-            device_id: Yedek bilgisayarın Syncthing Device ID'si
-            name: Yedek düğüm için görünen ad
+        Syncthing servisi kimlik bilgilerini yapılandırma dosyasından günceller.
         """
-        config_data = self.config_manager.load()
         syncthing_data = config_data.get("syncthing", {})
 
         # Önce config.xml'den güncel kimlik bilgilerini senkronize et
@@ -559,10 +552,10 @@ class InstallerEngine:
         self.syncthing_service.api_base = f"http://127.0.0.1:{gui_port}"
         self.syncthing_service._headers["X-API-Key"] = api_key
 
-        # Cihazı ekle (karşılıklı klasör paylaşımının takılmaması için auto_accept=True)
-        self.syncthing_service.add_device(device_id, name or "Yedek Düğüm", auto_accept=True)
-
-        # Site klasörünü paylaş
+    def _get_site_root_path(self, config_data: dict) -> str:
+        """
+        Senkronize edilecek sitenin kök dizinini döndürür.
+        """
         site_root = config_data.get("site_root_path", "")
         if not site_root:
             try:
@@ -574,14 +567,12 @@ class InstallerEngine:
                 pass
         if not site_root:
             site_root = str(constants.SITE_DIR)
+        return site_root
 
-        self.syncthing_service.share_folder(
-            folder_id="auto-home-web",
-            folder_path=site_root,
-            device_ids=[device_id],
-            label="AHWS Web Site",
-        )
-
+    def _save_secondary_device_id(self, config_data: dict, device_id: str) -> None:
+        """
+        Yeni yedek cihazın ID'sini yapılandırma dosyasına kaydeder.
+        """
         try:
             sec_ids = list(config_data.get("secondary_device_ids", []))
             if device_id not in sec_ids:
@@ -590,6 +581,34 @@ class InstallerEngine:
             self.config_manager.save(config_data, include_metadata=False)
         except Exception:
             pass
+
+    def add_secondary_node(self, device_id: str, name: str = "") -> None:
+        """
+        Mevcut kuruluma yeni bir yedek düğüm ekler.
+
+        Merkez bilgisayardan, kurulum tamamlandıktan sonra çağrılır.
+
+        Args:
+            device_id: Yedek bilgisayarın Syncthing Device ID'si
+            name: Yedek düğüm için görünen ad
+        """
+        config_data = self.config_manager.load()
+
+        self._update_syncthing_credentials(config_data)
+
+        # Cihazı ekle (karşılıklı klasör paylaşımının takılmaması için auto_accept=True)
+        self.syncthing_service.add_device(device_id, name or "Yedek Düğüm", auto_accept=True)
+
+        site_root = self._get_site_root_path(config_data)
+
+        self.syncthing_service.share_folder(
+            folder_id="auto-home-web",
+            folder_path=site_root,
+            device_ids=[device_id],
+            label="AHWS Web Site",
+        )
+
+        self._save_secondary_device_id(config_data, device_id)
 
         logger.info(f"Yedek düğüm eklendi: {device_id[:12]}...")
 
