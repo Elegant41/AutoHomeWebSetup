@@ -219,7 +219,7 @@ class Downloader:
         return True
 
     def get_latest_release_url(
-        self, repo_api: str, download_pattern: str, expected_ext: str = ""
+        self, repo_api: str, expected_ext: str = ""
     ) -> tuple[str, str]:
         """
         GitHub Releases API'den en son sürümün indirme URL'sini alır.
@@ -227,7 +227,7 @@ class Downloader:
 
         Args:
             repo_api: GitHub Releases API URL'si
-            download_pattern: İndirme URL şablonu (fn: {version})
+            expected_ext: Beklenen dosya uzantısı
 
         Returns:
             tuple[str, str]: (indirme_url, sürüm)
@@ -258,9 +258,7 @@ class Downloader:
                             self._expected_hashes[download_url] = digest.split(":", 1)[1].strip()
                         return download_url, version
 
-            # Asset bulunamadıysa şablonu kullan
-            download_url = download_pattern.format(version=version)
-            return download_url, version
+            raise DownloadError(f"API yanıtında uygun ({expected_ext}) Windows amd64 asset'i bulunamadı.")
 
         except requests.RequestException as e:
             raise DownloadError(f"GitHub API çağrısı başarısız: {e}") from e
@@ -283,7 +281,6 @@ class Downloader:
 
             download_url, version = self.get_latest_release_url(
                 constants.CADDY_RELEASE_API,
-                constants.CADDY_DOWNLOAD_PATTERN,
                 expected_ext=".zip",
             )
 
@@ -327,7 +324,6 @@ class Downloader:
 
             download_url, version = self.get_latest_release_url(
                 constants.CLOUDFLARED_RELEASE_API,
-                constants.CLOUDFLARED_DOWNLOAD_PATTERN,
                 expected_ext=".exe",
             )
 
@@ -357,7 +353,6 @@ class Downloader:
 
             download_url, version = self.get_latest_release_url(
                 constants.SYNCTHING_RELEASE_API,
-                constants.SYNCTHING_DOWNLOAD_PATTERN,
                 expected_ext=".zip",
             )
 

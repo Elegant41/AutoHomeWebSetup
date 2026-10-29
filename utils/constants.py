@@ -50,29 +50,10 @@ SYNCTHING_EXE = "syncthing.exe"
 NSSM_EXE = "nssm.exe"
 
 # ─── GitHub Release URL'leri ──────────────────────────────────────────
-# Not: Versiyonlar sabit değil, güncel sürüm için API çağrısı yapılacak.
-# Bu URL'ler indirme template'leri olarak kullanılacak.
+# Not: Versiyonlar sabit değil, güncel sürüm için doğrudan API çağrısı yapılmaktadır.
 CADDY_RELEASE_API = "https://api.github.com/repos/caddyserver/caddy/releases/latest"
-CADDY_DOWNLOAD_PATTERN = (
-    "https://github.com/caddyserver/caddy/releases/download/"
-    "v{version}/caddy_{version}_windows_amd64.zip"
-)
-
-CLOUDFLARED_RELEASE_API = (
-    "https://api.github.com/repos/cloudflare/cloudflared/releases/latest"
-)
-CLOUDFLARED_DOWNLOAD_PATTERN = (
-    "https://github.com/cloudflare/cloudflared/releases/download/"
-    "{version}/cloudflared-windows-amd64.exe"
-)
-
-SYNCTHING_RELEASE_API = (
-    "https://api.github.com/repos/syncthing/syncthing/releases/latest"
-)
-SYNCTHING_DOWNLOAD_PATTERN = (
-    "https://github.com/syncthing/syncthing/releases/download/"
-    "v{version}/syncthing-windows-amd64-v{version}.zip"
-)
+CLOUDFLARED_RELEASE_API = "https://api.github.com/repos/cloudflare/cloudflared/releases/latest"
+SYNCTHING_RELEASE_API = "https://api.github.com/repos/syncthing/syncthing/releases/latest"
 
 # ─── Loglama ──────────────────────────────────────────────────────────
 LOG_FILE = LOGS_DIR / "installer.log"
