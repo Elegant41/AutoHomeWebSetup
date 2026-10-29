@@ -3,7 +3,6 @@ AutoHomeWebSetup - Sabitler
 Tüm uygulama genelinde kullanılan sabit değerler.
 """
 
-import os
 import string
 from pathlib import Path
 
