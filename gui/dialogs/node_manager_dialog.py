@@ -36,6 +36,24 @@ class NodeManagerDialog(tk.Toplevel):
         super().__init__(parent)
 
         self.controller = controller
+        self._setup_window(parent)
+
+        self.local_device_id = ""
+        self.join_key = ""
+        self._load_local_data()
+
+        content = tk.Frame(self, bg=theme.BG_COLOR, padx=theme.PADDING_LARGE, pady=18)
+        content.pack(fill=tk.BOTH, expand=True)
+
+        self._build_header(content)
+        self._build_local_id_card(content)
+        self._build_add_node_card(content)
+        self._build_nodes_list_card(content)
+        self._build_footer(content)
+
+        self._refresh_paired_nodes()
+
+    def _setup_window(self, parent):
         self.title(t("node_dialog_title"))
         self.geometry("700x580")
         self.resizable(False, False)
@@ -59,33 +77,7 @@ class NodeManagerDialog(tk.Toplevel):
 
         self._center_window()
 
-        # ─── İçerik ─────────────────────────────────────────────────
-        content = tk.Frame(self, bg=theme.BG_COLOR, padx=theme.PADDING_LARGE, pady=18)
-        content.pack(fill=tk.BOTH, expand=True)
-
-        title_label = StyledLabel(
-            content,
-            text=t("node_dialog_title"),
-            font=theme.FONT_TITLE,
-            fg=theme.FG_COLOR,
-            bg=theme.BG_COLOR,
-        )
-        title_label.pack(anchor=tk.W, pady=(0, 2))
-
-        desc_label = StyledLabel(
-            content,
-            text=t("node_dialog_desc"),
-            font=theme.FONT_SMALL,
-            fg=theme.FG_SECONDARY,
-            bg=theme.BG_COLOR,
-            wraplength=640,
-            justify=tk.LEFT,
-        )
-        desc_label.pack(anchor=tk.W, pady=(0, 10))
-
-        # ─── 1. Ana Bilgisayar Cihaz ID & Katılım Kodu Kartı ────────
-        self.local_device_id = ""
-        self.join_key = ""
+    def _load_local_data(self):
         try:
             from core.config_manager import ConfigManager
             from core.models import InstallConfig
@@ -111,58 +103,82 @@ class NodeManagerDialog(tk.Toplevel):
             except Exception:
                 pass
 
-        if self.local_device_id:
-            local_card = CardFrame(content, padx=14, pady=10)
-            local_card.pack(fill=tk.X, pady=(0, 10))
+    def _build_header(self, content):
+        title_label = StyledLabel(
+            content,
+            text=t("node_dialog_title"),
+            font=theme.FONT_TITLE,
+            fg=theme.FG_COLOR,
+            bg=theme.BG_COLOR,
+        )
+        title_label.pack(anchor=tk.W, pady=(0, 2))
 
-            local_header = tk.Frame(local_card, bg=theme.BG_SECONDARY)
-            local_header.pack(fill=tk.X, pady=(0, 6))
+        desc_label = StyledLabel(
+            content,
+            text=t("node_dialog_desc"),
+            font=theme.FONT_SMALL,
+            fg=theme.FG_SECONDARY,
+            bg=theme.BG_COLOR,
+            wraplength=640,
+            justify=tk.LEFT,
+        )
+        desc_label.pack(anchor=tk.W, pady=(0, 10))
 
-            if self.join_key:
-                self.copy_join_btn = PrimaryButton(
-                    local_header,
-                    text=t("btn_copy_join_key"),
-                    command=self._copy_join_key,
-                    width=20,
-                    pady=3,
-                    font=theme.FONT_SMALL_BOLD,
-                )
-                self.copy_join_btn.pack(side=tk.RIGHT, padx=(6, 0))
+    def _build_local_id_card(self, content):
+        if not self.local_device_id:
+            return
 
-            local_title = StyledLabel(
+        local_card = CardFrame(content, padx=14, pady=10)
+        local_card.pack(fill=tk.X, pady=(0, 10))
+
+        local_header = tk.Frame(local_card, bg=theme.BG_SECONDARY)
+        local_header.pack(fill=tk.X, pady=(0, 6))
+
+        if self.join_key:
+            self.copy_join_btn = PrimaryButton(
                 local_header,
-                text=t("node_dialog_local_id_title"),
+                text=t("btn_copy_join_key"),
+                command=self._copy_join_key,
+                width=20,
+                pady=3,
                 font=theme.FONT_SMALL_BOLD,
-                fg=theme.FG_SECONDARY,
-                bg=theme.BG_SECONDARY,
             )
-            local_title.pack(side=tk.LEFT)
+            self.copy_join_btn.pack(side=tk.RIGHT, padx=(6, 0))
 
-            local_row = tk.Frame(local_card, bg=theme.BG_SECONDARY)
-            local_row.pack(fill=tk.X)
+        local_title = StyledLabel(
+            local_header,
+            text=t("node_dialog_local_id_title"),
+            font=theme.FONT_SMALL_BOLD,
+            fg=theme.FG_SECONDARY,
+            bg=theme.BG_SECONDARY,
+        )
+        local_title.pack(side=tk.LEFT)
 
-            self.copy_local_btn = SecondaryButton(
-                local_row,
-                text=t("btn_copy"),
-                command=self._copy_local_id,
-                width=12,
-                pady=4,
-            )
-            self.copy_local_btn.pack(side=tk.RIGHT, padx=(6, 0))
+        local_row = tk.Frame(local_card, bg=theme.BG_SECONDARY)
+        local_row.pack(fill=tk.X)
 
-            local_id_lbl = StyledLabel(
-                local_row,
-                text=self.local_device_id,
-                font=theme.FONT_MONO_SMALL,
-                fg=theme.ACCENT_COLOR,
-                bg=theme.ENTRY_BG,
-                padx=8,
-                pady=5,
-                anchor=tk.W,
-            )
-            local_id_lbl.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.copy_local_btn = SecondaryButton(
+            local_row,
+            text=t("btn_copy"),
+            command=self._copy_local_id,
+            width=12,
+            pady=4,
+        )
+        self.copy_local_btn.pack(side=tk.RIGHT, padx=(6, 0))
 
-        # ─── 2. Yeni Yedek Device ID Ekleme Kartı ───────────────────
+        local_id_lbl = StyledLabel(
+            local_row,
+            text=self.local_device_id,
+            font=theme.FONT_MONO_SMALL,
+            fg=theme.ACCENT_COLOR,
+            bg=theme.ENTRY_BG,
+            padx=8,
+            pady=5,
+            anchor=tk.W,
+        )
+        local_id_lbl.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+    def _build_add_node_card(self, content):
         device_card = CardFrame(content, padx=14, pady=10, border_color=theme.ACCENT_COLOR)
         device_card.pack(fill=tk.X, pady=(0, 10))
 
@@ -218,7 +234,7 @@ class NodeManagerDialog(tk.Toplevel):
         self.device_id_hint.pack(anchor=tk.W, pady=(4, 0))
         self.device_id_var.trace_add("write", self._on_device_id_change)
 
-        # ─── 3. Eşleşmiş Yedek Düğümler Listesi Kartı ───────────────
+    def _build_nodes_list_card(self, content):
         self.nodes_card = CardFrame(content, padx=14, pady=10)
         self.nodes_card.pack(fill=tk.BOTH, expand=True, pady=(0, 8))
 
@@ -237,7 +253,7 @@ class NodeManagerDialog(tk.Toplevel):
         self.nodes_list_frame = tk.Frame(self.nodes_card, bg=theme.BG_SECONDARY)
         self.nodes_list_frame.pack(fill=tk.BOTH, expand=True)
 
-        # ─── Durum & Alt Kapat Butonu ───────────────────────────────
+    def _build_footer(self, content):
         footer = tk.Frame(content, bg=theme.BG_COLOR)
         footer.pack(fill=tk.X, side=tk.BOTTOM)
 
@@ -259,8 +275,6 @@ class NodeManagerDialog(tk.Toplevel):
             width=14,
         )
         close_btn.pack(side=tk.RIGHT)
-
-        self._refresh_paired_nodes()
 
     def _copy_local_id(self) -> None:
         """Ana bilgisayarın Device ID'sini panoya kopyalar."""
