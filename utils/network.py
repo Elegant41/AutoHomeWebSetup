@@ -6,6 +6,7 @@ Port kontrolü, bağlantı testi ve ağ durumu tespiti.
 
 import socket
 import urllib.request
+import concurrent.futures
 
 from utils.logger import get_logger
 
@@ -81,14 +82,21 @@ def check_local_http_health(port: int = 80, timeout: int = 3) -> bool:
     """
     Yerel Caddy sunucusunun sağlık durumunu kontrol eder (/ahws-health veya /).
     """
-    for path in ("/ahws-health", "/"):
+    def check_path(path: str) -> bool:
         try:
             url = f"http://127.0.0.1:{port}{path}"
             with urllib.request.urlopen(url, timeout=timeout) as resp:
                 if 200 <= resp.status < 400:
                     return True
         except Exception:
-            continue
+            pass
+        return False
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [executor.submit(check_path, path) for path in ("/ahws-health", "/")]
+        for future in concurrent.futures.as_completed(futures):
+            if future.result():
+                return True
     return False
 
 
