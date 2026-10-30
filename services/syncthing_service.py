@@ -5,7 +5,7 @@ Syncthing kurulumu, ilk yapılandırma üretimi, NSSM ile Windows
 servisi oluşturma, REST API yönetimi ve cihaz eşleştirme.
 """
 
-import random
+import secrets
 import time
 from pathlib import Path
 from typing import Optional
@@ -55,7 +55,7 @@ class SyncthingService:
     def _generate_api_key(self, length: int = constants.SYNCTHING_API_KEY_LENGTH) -> str:
         """Rastgele bir API anahtarı üretir."""
         return "".join(
-            random.SystemRandom().choice(constants.SYNCTHING_API_KEY_CHARS)
+            secrets.choice(constants.SYNCTHING_API_KEY_CHARS)
             for _ in range(length)
         )
 
