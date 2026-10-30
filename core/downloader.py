@@ -117,6 +117,7 @@ class Downloader:
 
                     total_size = int(response.headers.get("content-length", 0))
                     downloaded = 0
+                    last_percent = -1
 
                     with open(dest, "wb") as f:
                         for chunk in response.iter_content(chunk_size=constants.DOWNLOAD_CHUNK_SIZE):
@@ -128,7 +129,9 @@ class Downloader:
 
                             if total_size > 0 and progress_callback:
                                 percent = int((downloaded / total_size) * 100)
-                                progress_callback(percent, f"İndiriliyor: {dest.name} (%{percent})")
+                                if percent > last_percent:
+                                    progress_callback(percent, f"İndiriliyor: {dest.name} (%{percent})")
+                                    last_percent = percent
 
                 if progress_callback:
                     progress_callback(100, f"İndirme tamamlandı: {dest.name}")
