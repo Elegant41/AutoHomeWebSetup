@@ -188,7 +188,9 @@ class StyledButton(tk.Button):
             activebackground=self._active_bg,
             relief=tk.FLAT,
             bd=0,
-            highlightthickness=0,
+            highlightthickness=1,
+            highlightcolor=theme.ACCENT_COLOR,
+            highlightbackground=bg,
             padx=padx,
             pady=pady,
             width=width,
@@ -201,30 +203,31 @@ class StyledButton(tk.Button):
         self.bind("<Leave>", self._on_leave)
         self.bind("<ButtonPress-1>", self._on_press)
         self.bind("<ButtonRelease-1>", self._on_release)
+        self.bind("<Return>", lambda e: self.invoke())
 
     def _on_enter(self, _event=None) -> None:
         if str(self["state"]) != "disabled":
-            self.config(bg=self._hover_bg)
+            self.config(bg=self._hover_bg, highlightbackground=self._hover_bg)
 
     def _on_leave(self, _event=None) -> None:
         if str(self["state"]) != "disabled":
-            self.config(bg=self._bg)
+            self.config(bg=self._bg, highlightbackground=self._bg)
 
     def _on_press(self, _event=None) -> None:
         if str(self["state"]) != "disabled":
-            self.config(bg=self._active_bg)
+            self.config(bg=self._active_bg, highlightbackground=self._active_bg)
 
     def _on_release(self, _event=None) -> None:
         if str(self["state"]) != "disabled":
-            self.config(bg=self._hover_bg)
+            self.config(bg=self._hover_bg, highlightbackground=self._hover_bg)
 
     def set_state(self, state: str) -> None:
         """Buton durumunu değiştirir (normal/disabled)."""
         self.config(state=state)
         if state == "disabled":
-            self.config(bg=theme.BUTTON_DISABLED_BG, fg=theme.BUTTON_DISABLED_TEXT, cursor="arrow")
+            self.config(bg=theme.BUTTON_DISABLED_BG, highlightbackground=theme.BUTTON_DISABLED_BG, fg=theme.BUTTON_DISABLED_TEXT, cursor="arrow")
         else:
-            self.config(bg=self._bg, fg=theme.BUTTON_TEXT, cursor="hand2")
+            self.config(bg=self._bg, highlightbackground=self._bg, fg=theme.BUTTON_TEXT, cursor="hand2")
 
 
 class PrimaryButton(StyledButton):

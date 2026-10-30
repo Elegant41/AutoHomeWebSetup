@@ -1,0 +1,3 @@
+## 2023-10-30 - Accessible Tkinter Buttons
+**Learning:** Tkinter custom buttons silently trap keyboard users in two major ways: 1) `highlightthickness=0` (used for borderless modern designs) completely removes the keyboard focus ring, and 2) buttons only respond to the Spacebar key by default, not Enter (`<Return>`), which is unexpected for standard UX.
+**Action:** Always enforce `highlightthickness=1` with custom `highlightcolor`/`highlightbackground` to maintain focus rings in flat designs, and explicitly bind `<Return>` to `self.invoke()` on custom button widgets.
