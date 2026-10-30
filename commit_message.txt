@@ -1,0 +1,7 @@
+🛡️ Sentinel: [MEDIUM] Fix insecure random module usage for API keys
+
+🚨 Severity: MEDIUM
+💡 Vulnerability: API keys for Syncthing were generated using the `random` module via `random.SystemRandom().choice()`. While technically it relies on `os.urandom()` securely, it does not use the modern Python standard approach for cryptographic keys (`secrets` module).
+🎯 Impact: Minor risk. Although `SystemRandom` is strong, standardizing on the `secrets` module prevents confusion and ensures best practices, avoiding future regressions if developers incorrectly fallback to `random.choice`.
+🔧 Fix: Replaced `import random` with `import secrets` and updated `_generate_api_key` to use `secrets.choice()` for generating API keys in `services/syncthing_service.py`.
+✅ Verification: Ensure the module `secrets` is available (standard in Python 3.6+). Tests show that the API key generation still successfully generates a 32-character API key, keeping Syncthing secure.
